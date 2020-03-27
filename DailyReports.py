@@ -8,7 +8,7 @@ from datetime import datetime
 import state_codes
 
 class DailyReports(object):
-    def __init__(self, reports_directory='/Users/davidgrote/COVID19/COVID-19/csse_covid_19_data/csse_covid_19_daily_reports'):
+    def __init__(self, reports_directory='../COVID-19/csse_covid_19_data/csse_covid_19_daily_reports'):
         self.reports_directory = reports_directory
 
         files = os.listdir(self.reports_directory)

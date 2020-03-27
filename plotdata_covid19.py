@@ -225,7 +225,7 @@ plotcountries(fig, ax[0,1], country_list, which='Confirmed', scale_population=Tr
 plotcountries(fig, ax[1,1], country_list, which='Deaths', scale_population=True)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.savefig('/Users/davidgrote/Dropbox/Public/COVID19/country_cases.png')
+fig.savefig('../../Dropbox/Public/COVID19/country_cases.png')
 fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
@@ -234,7 +234,7 @@ plotcountries(fig, ax[0], country_list, which='Confirmed', scale_population=Fals
 plotcountries(fig, ax[1], country_list, which='Deaths', scale_population=False, logderivative=True, do_legend=False)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.savefig('/Users/davidgrote/Dropbox/Public/COVID19/country_doubling_rates.png')
+fig.savefig('../../Dropbox/Public/COVID19/country_doubling_rates.png')
 fig.show()
 
 
@@ -246,7 +246,7 @@ plotstates(fig, ax[0,1], state_list, which='Confirmed', scale_population=True, d
 plotstates(fig, ax[1,1], state_list, which='Deaths', scale_population=True)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.savefig('/Users/davidgrote/Dropbox/Public/COVID19/state_cases.png')
+fig.savefig('../../Dropbox/Public/COVID19/state_cases.png')
 fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
@@ -255,7 +255,7 @@ plotstates(fig, ax[0], state_list, which='Confirmed', scale_population=False, lo
 plotstates(fig, ax[1], state_list, which='Deaths', scale_population=False, logderivative=True, do_legend=False)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.savefig('/Users/davidgrote/Dropbox/Public/COVID19/state_doubling_rates.png')
+fig.savefig('../../Dropbox/Public/COVID19/state_doubling_rates.png')
 fig.show()
 
 
@@ -265,7 +265,7 @@ plotcounties(fig, ax[0], county_list, which='Confirmed', do_legend=True)
 plotcounties(fig, ax[1], county_list, which='Deaths', do_legend=False)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.savefig('/Users/davidgrote/Dropbox/Public/COVID19/county_cases.png')
+fig.savefig('../../Dropbox/Public/COVID19/county_cases.png')
 fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
@@ -274,6 +274,6 @@ plotcounties(fig, ax[0], county_list, which='Confirmed', logderivative=True, do_
 plotcounties(fig, ax[1], county_list, which='Deaths', logderivative=True, do_legend=False)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.savefig('/Users/davidgrote/Dropbox/Public/COVID19/county_doubling_rates.png')
+fig.savefig('../../Dropbox/Public/COVID19/county_doubling_rates.png')
 fig.show()
 
