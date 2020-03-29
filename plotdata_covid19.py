@@ -219,6 +219,7 @@ def plotcounties(fig, ax, county_list, which='Confirmed', do_legend=False, logde
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
+country_list = dailyreports.find_max_countries('Confirmed') # population_df=country_populations)
 plotcountries(fig, ax[0,0], country_list, which='Confirmed', scale_population=False)
 plotcountries(fig, ax[1,0], country_list, which='Deaths', scale_population=False,)
 plotcountries(fig, ax[0,1], country_list, which='Confirmed', scale_population=True, do_legend=True)
@@ -240,6 +241,9 @@ fig.show()
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
+state_list = dailyreports.find_max_states('Confirmed', population_df=state_populations)
+if 'California' not in state_list:
+    state_list.append('California')
 plotstates(fig, ax[0,0], state_list, which='Confirmed', scale_population=False)
 plotstates(fig, ax[1,0], state_list, which='Deaths', scale_population=False,)
 plotstates(fig, ax[0,1], state_list, which='Confirmed', scale_population=True, do_legend=True)
@@ -261,6 +265,7 @@ fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
 
+county_list = dailyreports.find_max_counties('Confirmed')
 plotcounties(fig, ax[0], county_list, which='Confirmed', do_legend=True)
 plotcounties(fig, ax[1], county_list, which='Deaths', do_legend=False)
 
