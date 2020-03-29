@@ -64,12 +64,9 @@ def smoother(n, nsmooth=1):
         n[0] *= 4./3.
         n[-1] *= 4./3.
 
-def plotcountry(ax, country='France', which='Confirmed', scale_population=False, logderivative=False):
-
-    cases, dates = dailyreports.country_data(country, which)
-
+def _plot_region(ax, country, cases, dates, scale_population, population_df=None, logderivative=False):
     if scale_population:
-        population = int(country_populations[country_populations['Name'] == country]['Population'])
+        population = int(population_df[population_df['Name'] == country]['Population'])
         cases /= population
 
     if logderivative:
@@ -86,50 +83,27 @@ def plotcountry(ax, country='France', which='Confirmed', scale_population=False,
     ax.plot(dates, cases, label=country)
 
 
+def plotcountry(ax, country='France', which='Confirmed', scale_population=False, logderivative=False):
+    cases, dates = dailyreports.country_data(country, which)
+    _plot_region(ax, country, cases, dates, scale_population,
+                 population_df=country_populations, logderivative=logderivative)
+
 def plotstate(ax, state='California', which='Confirmed', scale_population=False, logderivative=False):
-
     cases, dates = dailyreports.state_data(state, which)
-
-    if scale_population:
-        population = int(state_populations[state_populations['State'] == state]['Population estimate July 1 2019'])
-        cases /= population
-
-    if logderivative:
-        if cases.max() == 0:
-            cases[...] = 1
-        casesmin = (cases[cases>0]).min()
-        log10cases = np.log10(cases.clip(casesmin).astype(float))
-        log2cases = log10cases/np.log10(2.)
-        cases = (log2cases[2:] - log2cases[:-2])/2.
-        smoother(cases, nsmooth=5)
-        cases = 1./cases.clip(0.1)
-        dates = dates[1:-1]
-
-    ax.plot(dates, cases, label=state)
+    _plot_region(ax, state, cases, dates, scale_population,
+                 population_df=state_populations, logderivative=logderivative)
 
 
-def plotcounty(ax, county='Contra Costa', which='Confirmed', logderivative=False):
-
+def plotcounty(ax, county='Contra Costa', which='Confirmed', scale_population=False, logderivative=False):
     cases, dates = dailyreports.county_data(county, which)
+    _plot_region(ax, county, cases, dates, scale_population=False,
+                 population_df=None, logderivative=logderivative)
 
-    if logderivative:
-        if cases.max() == 0:
-            cases[...] = 1
-        casesmin = (cases[cases>0]).min()
-        log10cases = np.log10(cases.clip(casesmin).astype(float))
-        log2cases = log10cases/np.log10(2.)
-        cases = (log2cases[2:] - log2cases[:-2])/2.
-        smoother(cases, nsmooth=5)
-        cases = 1./cases.clip(0.1)
-        dates = dates[1:-1]
+def _plot_regions(fig, ax, plotfunc, region_list, which='Confirmed', scale_population=False,
+                  do_legend=False, logderivative=False, start_date=None):
 
-    ax.plot(dates, cases, label=county)
-
-
-def plotcountries(fig, ax, country_list, which='Confirmed', scale_population=False, do_legend=False, logderivative=False):
-
-    for country in country_list:
-        plotcountry(ax, country, which, scale_population, logderivative)
+    for region in region_list:
+        plotfunc(ax, region, which, scale_population, logderivative)
 
     # set nice formatting and centering
     fig.autofmt_xdate()
@@ -153,68 +127,28 @@ def plotcountries(fig, ax, country_list, which='Confirmed', scale_population=Fal
     ax.set_ylabel(ylabel)
     ax.tick_params(right=True, labelright=False)
 
-    if do_legend:
-        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-
-
-def plotstates(fig, ax, statelist, which='Confirmed', scale_population=False, do_legend=False, logderivative=False):
-
-    for state in statelist:
-        plotstate(ax, state, which, scale_population, logderivative)
-
-    fig.autofmt_xdate()
-
-    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-
-    if logderivative:
-        ax.set_ylim(0.)
-    else:
-        ax.set_yscale('log')
-
-    fig.tight_layout()
-    fig.subplots_adjust(bottom=.125)
-    ax.set_xlabel('Date')
-    ylabel = '# '+which
-    if scale_population:
-        ylabel += '/pop'
-    if logderivative:
-        ylabel = 'doubling days ' + which
-    ax.set_ylabel(ylabel)
-    ax.tick_params(right=True, labelright=False)
-
-    ax.set_xlim(datetime.date(2020, 3, 1))
+    if start_date is not None:
+        ax.set_xlim(start_date)
 
     if do_legend:
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
 
-def plotcounties(fig, ax, county_list, which='Confirmed', do_legend=False, logderivative=False):
+def plotcountries(fig, ax, country_list, which='Confirmed', scale_population=False,
+                  do_legend=False, logderivative=False, start_date=None):
+    _plot_regions(fig, ax, plotcountry, country_list, which, scale_population,
+                  do_legend, logderivative, start_date)
 
-    for county in county_list:
-        plotcounty(ax, county, which, logderivative)
+def plotstates(fig, ax, state_list, which='Confirmed', scale_population=False,
+               do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 1)):
+    _plot_regions(fig, ax, plotstate, state_list, which, scale_population,
+                  do_legend, logderivative, start_date)
 
-    fig.autofmt_xdate()
-
-    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-
-    if logderivative:
-        ax.set_ylim(0.)
-    else:
-        ax.set_yscale('log')
-
-    fig.tight_layout()
-    fig.subplots_adjust(bottom=.125)
-    ax.set_xlabel('Date')
-    ylabel = '# '+which
-    if logderivative:
-        ylabel = 'doubling days ' + which
-    ax.set_ylabel(ylabel)
-    ax.tick_params(right=True, labelright=False)
-
-    ax.set_xlim(datetime.date(2020, 3, 1))
-
-    if do_legend:
-        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+def plotcounties(fig, ax, county_list, which='Confirmed',
+                 do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 1)):
+    scale_population = False
+    _plot_regions(fig, ax, plotcounty, county_list, which, scale_population,
+                  do_legend, logderivative, start_date)
 
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
