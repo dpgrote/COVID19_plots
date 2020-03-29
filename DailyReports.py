@@ -78,35 +78,38 @@ class DailyReports(object):
             countries.append(country)
         report['Country_Region'] = countries
 
-    def county_data(self, county, which='Confirmed'):
+    def data_from_report(self, column, name, which, report):
+        case = None
+        if report[column].isnull().all():
+            # All NaNs, no data for this date
+            return case
+        df = report[report[column] == name]
+        if len(df) > 0:
+            case = 0
+            for index in df.index:
+                value = report[which][index]
+                if not np.isnan(value):
+                    case += int(value)
+        return case
+
+    def county_data(self, county, which='Confirmed', state='California'):
         cases = []
         dates = []
         for date, report in zip(self.dates, self.reports):
-            if report['Admin2'].isnull().all():
-                # All NaNs, no data for this date
-                continue
-            df = report[report['Admin2'] == county]
-            if len(df) > 0:
-                case = 0
-                for index in df.index:
-                    value = report[which][index]
-                    if not np.isnan(value):
-                        case += int(value)
+            report = report[report['Province_State'] == state]
+            case = self.data_from_report('Admin2', county, which, report)
+            if case is not None:
                 cases.append(case)
                 dates.append(date)
         return np.array(cases, dtype=float), dates
         
-    def state_data(self, state, which='Confirmed'):
+    def state_data(self, state, which='Confirmed', country='US'):
         cases = []
         dates = []
         for date, report in zip(self.dates, self.reports):
-            df = report[report['Province_State'] == state]
-            if len(df) > 0:
-                case = 0
-                for index in df.index:
-                    value = report[which][index]
-                    if not np.isnan(value):
-                        case += int(value)
+            report = report[report['Country_Region'] == country]
+            case = self.data_from_report('Province_State', state, which, report)
+            if case is not None:
                 cases.append(case)
                 dates.append(date)
         return np.array(cases, dtype=float), dates
@@ -115,13 +118,8 @@ class DailyReports(object):
         cases = []
         dates = []
         for date, report in zip(self.dates, self.reports):
-            df = report[report['Country_Region'] == country]
-            if len(df) > 0:
-                case = 0
-                for index in df.index:
-                    value = report[which][index]
-                    if not np.isnan(value):
-                        case += int(value)
+            case = self.data_from_report('Country_Region', country, which, report)
+            if case is not None:
                 cases.append(case)
                 dates.append(date)
         return np.array(cases, dtype=float), dates
