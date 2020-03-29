@@ -124,3 +124,43 @@ class DailyReports(object):
                 dates.append(date)
         return np.array(cases, dtype=float), dates
 
+    def find_max_regions(self, which, column, ncases=10, population_df=None, get_regions=None):
+        maxregions = []
+        maxcases = []
+        report = self.reports[-1]
+        if get_regions is not None:
+            report = get_regions(report)
+        for region in report[column].unique():
+            cases = self.data_from_report(column, region, which, report)
+            if cases is None:
+                continue
+            if population_df is not None:
+                population = population_df[population_df['Name'] == region]['Population']
+                if len(population) == 0:
+                    continue
+                population = int(population)
+                cases = cases/population
+            if len(maxcases) < ncases:
+                maxregions.append(region)
+                maxcases.append(cases)
+            elif cases > min(maxcases):
+                ii = np.argmin(maxcases)
+                maxregions[ii] = region
+                maxcases[ii] = cases
+        # sort in descending order
+        ii = np.argsort(maxcases)[::-1]
+        result = []
+        for i in ii:
+            result.append(maxregions[i])
+        return result
+
+    def find_max_countries(self, which, ncases=10, population_df=None):
+        return self.find_max_regions(which, 'Country_Region', ncases, population_df)
+
+    def find_max_states(self, which, ncases=10, population_df=None, country='US'):
+        return self.find_max_regions(which, 'Province_State', ncases, population_df,
+                                     get_regions=lambda report : report[report['Country_Region'] == country])
+
+    def find_max_counties(self, which, ncases=10, population_df=None, state='California'):
+        return self.find_max_regions(which, 'Admin2', ncases, population_df,
+                                     get_regions=lambda report : report[report['Province_State'] == state])
