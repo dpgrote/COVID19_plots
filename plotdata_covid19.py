@@ -63,10 +63,10 @@ def smoother(n, nsmooth=1):
         n[0] *= 4./3.
         n[-1] *= 4./3.
 
-def _plot_region(ax, country, cases, dates, scale_population, population_df=None,
+def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
                  logderivative=False, day_zero_value=None):
     if scale_population:
-        population = int(population_df[population_df['Name'] == country]['Population'])
+        population = int(population_df[population_df['Name'] == region]['Population'])
         cases /= population
 
     if logderivative:
@@ -81,11 +81,21 @@ def _plot_region(ax, country, cases, dates, scale_population, population_df=None
         dates = dates[1:-1]
 
     if day_zero_value is not None:
-        ii = (cases > day_zero_value)
-        cases = cases[ii]
-        dates = range(len(cases))
+        ii_included = np.nonzero(cases >= day_zero_value)[0]
+        if len(ii_included) == 0:
+            #print(f'No data for {region} over day_zero_value')
+            return
+        # --- ii is the last value below day_zero_value
+        ii = ii_included[0] - 1
+        if ii == -1:
+            # --- All values are > day_zero_value.
+            # --- In this case, extrapolation will be done
+            ii = 0
+        ww = (np.log10(day_zero_value) - np.log10(cases[ii]))/(np.log10(cases[ii+1]) - np.log10(cases[ii]))
+        cases = cases[ii_included]
+        dates = np.arange(len(cases)) + (1. - ww)
 
-    ax.plot(dates, cases, label=country)
+    ax.plot(dates, cases, label=region)
 
 
 def plotcountry(ax, country='France', which='Confirmed', scale_population=False,
