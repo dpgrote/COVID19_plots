@@ -124,7 +124,7 @@ class DailyReports(object):
                 dates.append(date)
         return np.array(cases, dtype=float), dates
 
-    def find_max_regions(self, which, column, ncases=10, population_df=None, get_regions=None):
+    def find_max_regions(self, which, column, ncases=10, population_df=None, get_regions=None, mincases=0):
         maxregions = []
         maxcases = []
         report = self.reports[-1]
@@ -133,6 +133,8 @@ class DailyReports(object):
         for region in report[column].unique():
             cases = self.data_from_report(column, region, which, report)
             if cases is None:
+                continue
+            if cases < mincases:
                 continue
             if population_df is not None:
                 population = population_df[population_df['Name'] == region]['Population']
@@ -154,13 +156,16 @@ class DailyReports(object):
             result.append(maxregions[i])
         return result
 
-    def find_max_countries(self, which, ncases=10, population_df=None):
-        return self.find_max_regions(which, 'Country_Region', ncases, population_df)
+    def find_max_countries(self, which, ncases=10, population_df=None, mincases=0):
+        return self.find_max_regions(which, 'Country_Region', ncases, population_df,
+                                     mincases=mincases)
 
-    def find_max_states(self, which, ncases=10, population_df=None, country='US'):
+    def find_max_states(self, which, ncases=10, population_df=None, country='US', mincases=0):
         return self.find_max_regions(which, 'Province_State', ncases, population_df,
-                                     get_regions=lambda report : report[report['Country_Region'] == country])
+                                     get_regions=lambda report : report[report['Country_Region'] == country],
+                                     mincases=mincases)
 
-    def find_max_counties(self, which, ncases=10, population_df=None, state='California'):
+    def find_max_counties(self, which, ncases=10, population_df=None, state='California', mincases=0):
         return self.find_max_regions(which, 'Admin2', ncases, population_df,
-                                     get_regions=lambda report : report[report['Province_State'] == state])
+                                     get_regions=lambda report : report[report['Province_State'] == state],
+                                     mincases=mincases)
