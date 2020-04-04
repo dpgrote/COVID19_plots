@@ -26,7 +26,7 @@ class DailyReports(object):
                 #self.fix_dates(report)
                 self.fix_country_names(report)
                 self.dates.append(f[0:2] + '/' + f[3:5] + '/' + f[8:10])
-        self.dates = [datetime.strptime(d, "%m/%d/%y") for d in self.dates]
+        self.dates = [datetime.strptime(d, "%m/%d/%y").date() for d in self.dates]
 
     def fix_old_column_names(self, report):
         report.rename(columns = {'Country/Region':'Country_Region',

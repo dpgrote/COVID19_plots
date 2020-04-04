@@ -65,7 +65,7 @@ def smoother(n, nsmooth=1):
         n[-1] *= 4./3.
 
 def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
-                 logderivative=False, day_zero_value=None):
+                 logderivative=False, day_zero_value=None, start_date=None, nsmooth=5):
     if scale_population:
         population = int(population_df[population_df['Name'] == region]['Population'])
         cases /= population
@@ -77,7 +77,8 @@ def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
         log10cases = np.log10(cases.clip(casesmin).astype(float))
         log2cases = log10cases/np.log10(2.)
         cases = (log2cases[2:] - log2cases[:-2])/2.
-        smoother(cases, nsmooth=5)
+        if nsmooth is not None:
+            smoother(cases, nsmooth)
         cases = 1./cases.clip(0.1)
         dates = dates[1:-1]
 
@@ -95,36 +96,40 @@ def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
         ww = (np.log10(day_zero_value) - np.log10(cases[ii]))/(np.log10(cases[ii+1]) - np.log10(cases[ii]))
         cases = cases[ii_included]
         dates = np.arange(len(cases)) + (1. - ww)
+    elif start_date is not None:
+        ii = np.nonzero(np.greater(dates, start_date))[0]
+        cases = cases[ii]
+        dates = np.take(dates, ii)
 
     ax.plot(dates, cases, label=region)
 
 
 def plotcountry(ax, country='France', which='Confirmed', scale_population=False,
-                logderivative=False, day_zero_value=None):
+                logderivative=False, day_zero_value=None, start_date=None, nsmooth=5):
     cases, dates = dailyreports.country_data(country, which)
     _plot_region(ax, country, cases, dates, scale_population,
                  population_df=country_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value)
+                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth)
 
 def plotstate(ax, state='California', which='Confirmed', scale_population=False,
-              logderivative=False, day_zero_value=None):
+              logderivative=False, day_zero_value=None, start_date=None, nsmooth=5):
     cases, dates = dailyreports.state_data(state, which)
     _plot_region(ax, state, cases, dates, scale_population,
                  population_df=state_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value)
+                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth)
 
 def plotcounty(ax, county='Contra Costa', which='Confirmed', scale_population=False,
-               logderivative=False, day_zero_value=None):
+               logderivative=False, day_zero_value=None, start_date=None, nsmooth=3):
     cases, dates = dailyreports.county_data(county, which)
     _plot_region(ax, county, cases, dates, scale_population,
                  population_df=county_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value)
+                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth)
 
 def _plot_regions(fig, ax, plotfunc, region_list, which='Confirmed', scale_population=False,
                   do_legend=False, logderivative=False, start_date=None, day_zero_value=None):
 
     for region in region_list:
-        plotfunc(ax, region, which, scale_population, logderivative, day_zero_value)
+        plotfunc(ax, region, which, scale_population, logderivative, day_zero_value, start_date)
 
     if day_zero_value is None:
         # set nice formatting and centering
@@ -151,8 +156,8 @@ def _plot_regions(fig, ax, plotfunc, region_list, which='Confirmed', scale_popul
     ax.set_ylabel(ylabel)
     ax.tick_params(right=True, labelright=False, which='both')
 
-    if start_date is not None and day_zero_value is None:
-        ax.set_xlim(start_date)
+    #if start_date is not None and day_zero_value is None:
+        #ax.set_xlim(start_date)
 
     if do_legend:
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
