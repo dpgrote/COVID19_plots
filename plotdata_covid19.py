@@ -65,7 +65,8 @@ def smoother(n, nsmooth=1):
         n[-1] *= 4./3.
 
 def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
-                 logderivative=False, day_zero_value=None, start_date=None, nsmooth=5):
+                 logderivative=False, day_zero_value=None, start_date=None, nsmooth=5,
+                 doubling_days_max=10.):
     if scale_population:
         population = int(population_df[population_df['Name'] == region]['Population'])
         cases /= population
@@ -79,7 +80,7 @@ def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
         cases = (log2cases[2:] - log2cases[:-2])/2.
         if nsmooth is not None:
             smoother(cases, nsmooth)
-        cases = 1./cases.clip(0.1)
+        cases = 1./cases.clip(1./doubling_days_max)
         dates = dates[1:-1]
 
     if day_zero_value is not None:
@@ -105,31 +106,39 @@ def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
 
 
 def plotcountry(ax, country='France', which='Confirmed', scale_population=False,
-                logderivative=False, day_zero_value=None, start_date=None, nsmooth=5):
+                logderivative=False, day_zero_value=None, start_date=None, nsmooth=5,
+                doubling_days_max=10.):
     cases, dates = dailyreports.country_data(country, which)
     _plot_region(ax, country, cases, dates, scale_population,
                  population_df=country_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth)
+                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth,
+                 doubling_days_max=doubling_days_max)
 
 def plotstate(ax, state='California', which='Confirmed', scale_population=False,
-              logderivative=False, day_zero_value=None, start_date=None, nsmooth=5):
+              logderivative=False, day_zero_value=None, start_date=None, nsmooth=5,
+              doubling_days_max=10.):
     cases, dates = dailyreports.state_data(state, which)
     _plot_region(ax, state, cases, dates, scale_population,
                  population_df=state_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth)
+                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth,
+                 doubling_days_max=doubling_days_max)
 
 def plotcounty(ax, county='Contra Costa', which='Confirmed', scale_population=False,
-               logderivative=False, day_zero_value=None, start_date=None, nsmooth=3):
+               logderivative=False, day_zero_value=None, start_date=None, nsmooth=3,
+               doubling_days_max=10.):
     cases, dates = dailyreports.county_data(county, which)
     _plot_region(ax, county, cases, dates, scale_population,
                  population_df=county_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth)
+                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth,
+                 doubling_days_max=doubling_days_max)
 
 def _plot_regions(ax, plotfunc, region_list, which='Confirmed', scale_population=False,
-                  do_legend=False, logderivative=False, start_date=None, day_zero_value=None):
+                  do_legend=False, logderivative=False, start_date=None, day_zero_value=None,
+                  doubling_days_max=10.):
 
     for region in region_list:
-        plotfunc(ax, region, which, scale_population, logderivative, day_zero_value, start_date)
+        plotfunc(ax, region, which, scale_population, logderivative, day_zero_value, start_date,
+                 doubling_days_max=doubling_days_max)
 
     if day_zero_value is None:
         # set so ~10 dates are shown on the x axis
@@ -159,19 +168,22 @@ def _plot_regions(ax, plotfunc, region_list, which='Confirmed', scale_population
 
 
 def plotcountries(ax, country_list, which='Confirmed', scale_population=False,
-                  do_legend=False, logderivative=False, start_date=None, day_zero_value=None):
+                  do_legend=False, logderivative=False, start_date=None, day_zero_value=None,
+                  doubling_days_max=10.):
     _plot_regions(ax, plotcountry, country_list, which, scale_population,
-                  do_legend, logderivative, start_date, day_zero_value)
+                  do_legend, logderivative, start_date, day_zero_value,doubling_days_max)
 
 def plotstates(ax, state_list, which='Confirmed', scale_population=False,
-               do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 1), day_zero_value=None):
+               do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 1), day_zero_value=None,
+               doubling_days_max=10.):
     _plot_regions(ax, plotstate, state_list, which, scale_population,
-                  do_legend, logderivative, start_date, day_zero_value)
+                  do_legend, logderivative, start_date, day_zero_value,doubling_days_max)
 
 def plotcounties(ax, county_list, which='Confirmed', scale_population=False,
-                 do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 20), day_zero_value=None):
+                 do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 20), day_zero_value=None,
+                 doubling_days_max=10):
     _plot_regions(ax, plotcounty, county_list, which, scale_population,
-                  do_legend, logderivative, start_date, day_zero_value)
+                  do_legend, logderivative, start_date, day_zero_value,doubling_days_max)
 
 
 delay = 7
@@ -278,8 +290,8 @@ fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
 
-plotcountries(ax[0], country_list_confirmed, which='Confirmed', scale_population=False, logderivative=True, do_legend=True)
-plotcountries(ax[1], country_list_deaths, which='Deaths', scale_population=False, logderivative=True, do_legend=True)
+plotcountries(ax[0], country_list_confirmed, which='Confirmed', scale_population=False, logderivative=True, doubling_days_max=20., do_legend=True)
+plotcountries(ax[1], country_list_deaths, which='Deaths', scale_population=False, logderivative=True, doubling_days_max=20., do_legend=True)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
