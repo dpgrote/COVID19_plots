@@ -6,13 +6,13 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
-from DailyReports import DailyReports
+from TimeSeries import TimeSeriesCountries, TimeSeriesStates, TimeSeriesCounties
 
 matplotlib.interactive(True)
 
-#which = 'Deaths'
-#which = 'Confirmed'
-#which = 'Recovered'
+#which = 'deaths'
+#which = 'confirmed'
+#which = 'recovered'
 
 country_list = ['France',
                 'Italy',
@@ -47,7 +47,12 @@ county_list = ['Contra Costa',
                'Solano'
                ]
 
-dailyreports = DailyReports()
+countries_data = {'confirmed':TimeSeriesCountries(which='confirmed'),
+                  'deaths':TimeSeriesCountries(which='deaths')}
+states_data    = {'confirmed':TimeSeriesStates(which='confirmed'),
+                  'deaths':TimeSeriesStates(which='deaths')}
+counties_data  = {'confirmed':TimeSeriesCounties(which='confirmed'),
+                  'deaths':TimeSeriesCounties(which='deaths')}
 
 country_populations = pandas.read_csv('country_populations.csv')
 state_populations = pandas.read_csv('state_populations.csv')
@@ -64,9 +69,15 @@ def smoother(n, nsmooth=1):
         n[0] *= 4./3.
         n[-1] *= 4./3.
 
-def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
-                 logderivative=False, day_zero_value=None, start_date=None, nsmooth=5,
-                 doubling_days_max=10.):
+def _plot_region(ax, region, cases, dates, kw):
+    scale_population = kw.get('scale_population', False)
+    population_df = kw.get('population_df', None)
+    logderivative = kw.get('logderivative', False)
+    day_zero_value = kw.get('day_zero_value', None)
+    start_date = kw.get('start_date', None)
+    nsmooth = kw.get('nsmooth', 5)
+    doubling_days_max = kw.get('doubling_days_max', 10.)
+
     if scale_population:
         population = int(population_df[population_df['Name'] == region]['Population'])
         cases /= population
@@ -85,8 +96,8 @@ def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
 
     if day_zero_value is not None:
         ii_included = np.nonzero(cases >= day_zero_value)[0]
-        if len(ii_included) == 0:
-            #print(f'No data for {region} over day_zero_value')
+        if len(ii_included) <= 2:
+            #print(f'Not enough data for {region} over day_zero_value')
             return
         # --- ii is the last value below day_zero_value
         ii = ii_included[0] - 1
@@ -94,7 +105,13 @@ def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
             # --- All values are > day_zero_value.
             # --- In this case, extrapolation will be done
             ii = 0
-        ww = (np.log10(day_zero_value) - np.log10(cases[ii]))/(np.log10(cases[ii+1]) - np.log10(cases[ii]))
+        if cases[ii] == 0.:
+            ii += 1
+        denom = np.log10(cases[ii+1]) - np.log10(cases[ii])
+        if denom == 0.:
+            ww = 0.
+        else:
+            ww = (np.log10(day_zero_value) - np.log10(cases[ii]))/denom
         cases = cases[ii_included]
         dates = np.arange(len(cases)) + (1. - ww)
     elif start_date is not None:
@@ -105,40 +122,27 @@ def _plot_region(ax, region, cases, dates, scale_population, population_df=None,
     ax.plot(dates, cases, label=region)
 
 
-def plotcountry(ax, country='France', which='Confirmed', scale_population=False,
-                logderivative=False, day_zero_value=None, start_date=None, nsmooth=5,
-                doubling_days_max=10.):
-    cases, dates = dailyreports.country_data(country, which)
-    _plot_region(ax, country, cases, dates, scale_population,
-                 population_df=country_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth,
-                 doubling_days_max=doubling_days_max)
+def plotcountry(ax, country, which, kw):
+    cases, dates = countries_data[which].data(country)
+    _plot_region(ax, country, cases, dates, kw)
 
-def plotstate(ax, state='California', which='Confirmed', scale_population=False,
-              logderivative=False, day_zero_value=None, start_date=None, nsmooth=5,
-              doubling_days_max=10.):
-    cases, dates = dailyreports.state_data(state, which)
-    _plot_region(ax, state, cases, dates, scale_population,
-                 population_df=state_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth,
-                 doubling_days_max=doubling_days_max)
+def plotstate(ax, state, which, kw):
+    cases, dates = states_data[which].data(state)
+    _plot_region(ax, state, cases, dates, kw)
 
-def plotcounty(ax, county='Contra Costa', which='Confirmed', scale_population=False,
-               logderivative=False, day_zero_value=None, start_date=None, nsmooth=3,
-               doubling_days_max=10.):
-    cases, dates = dailyreports.county_data(county, which)
-    _plot_region(ax, county, cases, dates, scale_population,
-                 population_df=county_populations, logderivative=logderivative,
-                 day_zero_value=day_zero_value, start_date=start_date, nsmooth=nsmooth,
-                 doubling_days_max=doubling_days_max)
+def plotcounty(ax, county, which, kw):
+    cases, dates = counties_data[which].data(county)
+    _plot_region(ax, county, cases, dates, kw)
 
-def _plot_regions(ax, plotfunc, region_list, which='Confirmed', scale_population=False,
-                  do_legend=False, logderivative=False, start_date=None, day_zero_value=None,
-                  doubling_days_max=10.):
+
+def _plot_regions(ax, plotfunc, region_list, which, kw):
+    scale_population = kw.get('scale_population', False)
+    logderivative = kw.get('logderivative', False)
+    day_zero_value = kw.get('day_zero_value', None)
+    do_legend = kw.get('do_legend', False)
 
     for region in region_list:
-        plotfunc(ax, region, which, scale_population, logderivative, day_zero_value, start_date,
-                 doubling_days_max=doubling_days_max)
+        plotfunc(ax, region, which, kw)
 
     if day_zero_value is None:
         # set so ~10 dates are shown on the x axis
@@ -160,33 +164,26 @@ def _plot_regions(ax, plotfunc, region_list, which='Confirmed', scale_population
     ax.set_ylabel(ylabel)
     ax.tick_params(right=True, labelright=False, which='both')
 
-    #if start_date is not None and day_zero_value is None:
-        #ax.set_xlim(start_date)
-
     if do_legend:
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
 
-def plotcountries(ax, country_list, which='Confirmed', scale_population=False,
-                  do_legend=False, logderivative=False, start_date=None, day_zero_value=None,
-                  doubling_days_max=10.):
-    _plot_regions(ax, plotcountry, country_list, which, scale_population,
-                  do_legend, logderivative, start_date, day_zero_value,doubling_days_max)
+def plotcountries(ax, country_list, which, **kw):
+    kw.setdefault('population_df', country_populations)
+    _plot_regions(ax, plotcountry, country_list, which, kw)
 
-def plotstates(ax, state_list, which='Confirmed', scale_population=False,
-               do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 1), day_zero_value=None,
-               doubling_days_max=10.):
-    _plot_regions(ax, plotstate, state_list, which, scale_population,
-                  do_legend, logderivative, start_date, day_zero_value,doubling_days_max)
+def plotstates(ax, state_list, which, **kw):
+    kw.setdefault('population_df', state_populations)
+    kw.setdefault('start_date', datetime.date(2020, 3, 1))
+    _plot_regions(ax, plotstate, state_list, which, kw)
 
-def plotcounties(ax, county_list, which='Confirmed', scale_population=False,
-                 do_legend=False, logderivative=False, start_date=datetime.date(2020, 3, 20), day_zero_value=None,
-                 doubling_days_max=10):
-    _plot_regions(ax, plotcounty, county_list, which, scale_population,
-                  do_legend, logderivative, start_date, day_zero_value,doubling_days_max)
+def plotcounties(ax, county_list, which, **kw):
+    kw.setdefault('population_df', county_populations)
+    kw.setdefault('start_date', datetime.date(2020, 3, 20))
+    _plot_regions(ax, plotcounty, county_list, which, kw)
 
 
-delay = 7
+delay = 0
 def _plot_delayed_death_rates(ax, region, confirmed, deaths, start_date=None, dates=None):
 
     if len(confirmed) < delay:
@@ -197,22 +194,27 @@ def _plot_delayed_death_rates(ax, region, confirmed, deaths, start_date=None, da
         confirmed = confirmed[ii]
         deaths = deaths[ii]
 
-    delayed_ratio = deaths[delay:]/confirmed[:-delay].clip(1.)
-    ax.plot(confirmed[:-delay], delayed_ratio, label=region)
+    if delay > 0:
+        delayed_confirmed = confirmed[:-delay]
+    else:
+        delayed_confirmed = confirmed
+
+    delayed_ratio = deaths[delay:]/delayed_confirmed.clip(1.)
+    ax.plot(delayed_confirmed, delayed_ratio, label=region)
 
 def plotcountry_delayed_death_rates(ax, country='France', start_date=None):
-    confirmed, dates = dailyreports.country_data(country, 'Confirmed')
-    deaths, dates = dailyreports.country_data(country, 'Deaths')
+    confirmed, dates = countries_data['confirmed'].data(country)
+    deaths, dates = countries_data['deaths'].data(country)
     _plot_delayed_death_rates(ax, country, confirmed, deaths, start_date, dates)
 
 def plotstate_delayed_death_rates(ax, state='California', start_date=None):
-    confirmed, dates = dailyreports.state_data(state, 'Confirmed')
-    deaths, dates = dailyreports.state_data(state, 'Deaths')
+    confirmed, dates = states_data['confirmed'].data(state)
+    deaths, dates = states_data['deaths'].data(state)
     _plot_delayed_death_rates(ax, state, confirmed, deaths, start_date, dates)
 
 def plotcounty_delayed_death_rates(ax, county='Contra Costa', start_date=None):
-    confirmed, dates = dailyreports.county_data(county, 'Confirmed')
-    deaths, dates = dailyreports.county_data(county, 'Deaths')
+    confirmed, dates = counties_data['confirmed'].data(county)
+    deaths, dates = counties_data['deaths'].data(county)
     _plot_delayed_death_rates(ax, county, confirmed, deaths, start_date, dates)
 
 def _plot_regions_delayed_death_rates(ax, plotfunc, region_list, do_legend=False, start_date=None):
@@ -244,22 +246,22 @@ def plotcounties_delayed_death_rates(ax, county_list, do_legend=False, start_dat
 
 
 ####################### Countries
-country_list_confirmed = dailyreports.find_max_countries('Confirmed', population_df=country_populations, mincases=5000)
+country_list_confirmed = countries_data['confirmed'].find_maxes(population_df=country_populations, mincases=5000)
 for country in ['US', 'China', 'Korea, South']:
     if country not in country_list_confirmed:
         country_list_confirmed.append(country)
 
-country_list_deaths = dailyreports.find_max_countries('Deaths', population_df=country_populations, mincases=500)
+country_list_deaths = countries_data['deaths'].find_maxes(population_df=country_populations, mincases=500)
 for country in ['US', 'China', 'Korea, South']:
     if country not in country_list_deaths:
         country_list_deaths.append(country)
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-plotcountries(ax[0,0], country_list_confirmed, which='Confirmed', scale_population=False)
-plotcountries(ax[1,0], country_list_deaths, which='Deaths', scale_population=False)
-plotcountries(ax[0,1], country_list_confirmed, which='Confirmed', scale_population=True, do_legend=True)
-plotcountries(ax[1,1], country_list_deaths, which='Deaths', scale_population=True, do_legend=True)
+plotcountries(ax[0,0], country_list_confirmed, which='confirmed', scale_population=False)
+plotcountries(ax[1,0], country_list_deaths, which='deaths', scale_population=False)
+plotcountries(ax[0,1], country_list_confirmed, which='confirmed', scale_population=True, do_legend=True)
+plotcountries(ax[1,1], country_list_deaths, which='deaths', scale_population=True, do_legend=True)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -274,10 +276,10 @@ fig.show()
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-plotcountries(ax[0,0], country_list_confirmed, which='Confirmed', scale_population=False, day_zero_value=100)
-plotcountries(ax[1,0], country_list_deaths, which='Deaths', scale_population=False, day_zero_value=100)
-plotcountries(ax[0,1], country_list_confirmed, which='Confirmed', scale_population=True, do_legend=True, day_zero_value=1.e-6)
-plotcountries(ax[1,1], country_list_deaths, which='Deaths', scale_population=True, do_legend=True, day_zero_value=1.e-6)
+plotcountries(ax[0,0], country_list_confirmed, which='confirmed', scale_population=False, day_zero_value=100)
+plotcountries(ax[1,0], country_list_deaths, which='deaths', scale_population=False, day_zero_value=100)
+plotcountries(ax[0,1], country_list_confirmed, which='confirmed', scale_population=True, do_legend=True, day_zero_value=1.e-6)
+plotcountries(ax[1,1], country_list_deaths, which='deaths', scale_population=True, do_legend=True, day_zero_value=1.e-6)
 
 fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
@@ -290,8 +292,8 @@ fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
 
-plotcountries(ax[0], country_list_confirmed, which='Confirmed', scale_population=False, logderivative=True, doubling_days_max=20., do_legend=True)
-plotcountries(ax[1], country_list_deaths, which='Deaths', scale_population=False, logderivative=True, doubling_days_max=20., do_legend=True)
+plotcountries(ax[0], country_list_confirmed, which='confirmed', scale_population=False, logderivative=True, doubling_days_max=20., do_legend=True)
+plotcountries(ax[1], country_list_deaths, which='deaths', scale_population=False, logderivative=True, doubling_days_max=20., do_legend=True)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -306,7 +308,7 @@ fig.show()
 
 
 ####################### States
-state_list = dailyreports.find_max_states('Confirmed', population_df=state_populations, mincases=100)
+state_list = states_data['confirmed'].find_maxes(population_df=state_populations, mincases=100)
 if 'California' not in state_list:
     state_list.append('California')
 
@@ -314,10 +316,10 @@ fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
 if 'California' not in state_list:
     state_list.append('California')
-plotstates(ax[0,0], state_list, which='Confirmed', scale_population=False)
-plotstates(ax[1,0], state_list, which='Deaths', scale_population=False)
-plotstates(ax[0,1], state_list, which='Confirmed', scale_population=True, do_legend=True)
-plotstates(ax[1,1], state_list, which='Deaths', scale_population=True)
+plotstates(ax[0,0], state_list, which='confirmed', scale_population=False)
+plotstates(ax[1,0], state_list, which='deaths', scale_population=False)
+plotstates(ax[0,1], state_list, which='confirmed', scale_population=True, do_legend=True)
+plotstates(ax[1,1], state_list, which='deaths', scale_population=True)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -331,10 +333,10 @@ fig.show()
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-plotstates(ax[0,0], state_list, which='Confirmed', scale_population=False, day_zero_value=20)
-plotstates(ax[1,0], state_list, which='Deaths', scale_population=False, day_zero_value=20)
-plotstates(ax[0,1], state_list, which='Confirmed', scale_population=True, do_legend=True, day_zero_value=5.e-6)
-plotstates(ax[1,1], state_list, which='Deaths', scale_population=True, day_zero_value=5.e-6)
+plotstates(ax[0,0], state_list, which='confirmed', scale_population=False, day_zero_value=20)
+plotstates(ax[1,0], state_list, which='deaths', scale_population=False, day_zero_value=20)
+plotstates(ax[0,1], state_list, which='confirmed', scale_population=True, do_legend=True, day_zero_value=5.e-6)
+plotstates(ax[1,1], state_list, which='deaths', scale_population=True, day_zero_value=5.e-6)
 
 fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
@@ -346,8 +348,8 @@ fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
 
-plotstates(ax[0], state_list, which='Confirmed', scale_population=False, logderivative=True, do_legend=True)
-plotstates(ax[1], state_list, which='Deaths', scale_population=False, logderivative=True, do_legend=False)
+plotstates(ax[0], state_list, which='confirmed', scale_population=False, logderivative=True, do_legend=True)
+plotstates(ax[1], state_list, which='deaths', scale_population=False, logderivative=True, do_legend=False)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -362,16 +364,16 @@ fig.show()
 
 ####################### Counties
 
-county_list = dailyreports.find_max_counties('Confirmed', population_df=county_populations, mincases=100)
+county_list = counties_data['confirmed'].find_maxes(population_df=county_populations, mincases=100)
 if 'Contra Costa' not in county_list:
     county_list.append('Contra Costa')
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-plotcounties(ax[0,0], county_list, which='Confirmed', scale_population=False)
-plotcounties(ax[1,0], county_list, which='Deaths', scale_population=False)
-plotcounties(ax[0,1], county_list, which='Confirmed', scale_population=True, do_legend=True)
-plotcounties(ax[1,1], county_list, which='Deaths', scale_population=True)
+plotcounties(ax[0,0], county_list, which='confirmed', scale_population=False)
+plotcounties(ax[1,0], county_list, which='deaths', scale_population=False)
+plotcounties(ax[0,1], county_list, which='confirmed', scale_population=True, do_legend=True)
+plotcounties(ax[1,1], county_list, which='deaths', scale_population=True)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -386,8 +388,8 @@ fig.show()
 """
 fig, ax = plt.subplots(2, figsize=(7,8))
 
-plotcounties(ax[0], county_list, which='Confirmed', do_legend=True, day_zero_value=10)
-plotcounties(ax[1], county_list, which='Deaths', do_legend=False, day_zero_value=10)
+plotcounties(ax[0], county_list, which='confirmed', do_legend=True, day_zero_value=10)
+plotcounties(ax[1], county_list, which='deaths', do_legend=False, day_zero_value=10)
 
 fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
@@ -400,8 +402,8 @@ fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
 
-plotcounties(ax[0], county_list, which='Confirmed', logderivative=True, do_legend=True)
-plotcounties(ax[1], county_list, which='Deaths', logderivative=True, do_legend=False)
+plotcounties(ax[0], county_list, which='confirmed', logderivative=True, do_legend=True)
+plotcounties(ax[1], county_list, which='deaths', logderivative=True, do_legend=False)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -425,7 +427,8 @@ plotcounties_delayed_death_rates(ax[2], county_list, do_legend=True)
 fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
-fig.suptitle(f'Confirmed cases lagged by {delay} days', y=0.96)
+if delay > 0:
+    fig.suptitle(f'Confirmed cases lagged by {delay} days', y=0.96)
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
 fig.tight_layout()
 fig.savefig('../../Dropbox/Public/COVID19/delayed_death_rates.png')
