@@ -73,6 +73,7 @@ def _plot_region(ax, region, cases, dates, kw):
     scale_population = kw.get('scale_population', False)
     population_df = kw.get('population_df', None)
     logderivative = kw.get('logderivative', False)
+    derivative = kw.get('derivative', False)
     day_zero_value = kw.get('day_zero_value', None)
     start_date = kw.get('start_date', None)
     nsmooth = kw.get('nsmooth', 5)
@@ -93,6 +94,14 @@ def _plot_region(ax, region, cases, dates, kw):
             smoother(cases, nsmooth)
         cases = 1./cases.clip(1./doubling_days_max)
         dates = dates[1:-1]
+
+    if derivative:
+        if cases.max() == 0:
+            cases[...] = 1
+        cases = cases[1:] - cases[:-1]
+        if nsmooth is not None:
+            smoother(cases, nsmooth)
+        dates = dates[1:]
 
     if day_zero_value is not None:
         ii_included = np.nonzero(cases >= day_zero_value)[0]
@@ -122,27 +131,17 @@ def _plot_region(ax, region, cases, dates, kw):
     ax.plot(dates, cases, label=region)
 
 
-def plotcountry(ax, country, which, kw):
-    cases, dates = countries_data[which].data(country)
-    _plot_region(ax, country, cases, dates, kw)
-
-def plotstate(ax, state, which, kw):
-    cases, dates = states_data[which].data(state)
-    _plot_region(ax, state, cases, dates, kw)
-
-def plotcounty(ax, county, which, kw):
-    cases, dates = counties_data[which].data(county)
-    _plot_region(ax, county, cases, dates, kw)
-
-
-def _plot_regions(ax, plotfunc, region_list, which, kw):
+def _plot_regions(ax, dataframe_dict, region_list, which, kw):
     scale_population = kw.get('scale_population', False)
     logderivative = kw.get('logderivative', False)
+    derivative = kw.get('derivative', False)
     day_zero_value = kw.get('day_zero_value', None)
     do_legend = kw.get('do_legend', False)
+    ymin = kw.get('ymin', None)
 
     for region in region_list:
-        plotfunc(ax, region, which, kw)
+        cases, dates = dataframe_dict[which].data(region)
+        _plot_region(ax, region, cases, dates, kw)
 
     if day_zero_value is None:
         # set so ~10 dates are shown on the x axis
@@ -151,16 +150,21 @@ def _plot_regions(ax, plotfunc, region_list, which, kw):
     else:
         ax.set_xlabel('Days since start')
 
-    if logderivative:
+    if logderivative or derivative:
         ax.set_ylim(0.)
     else:
         ax.set_yscale('log')
 
-    ylabel = '# '+which
+    if ymin is not None:
+        ax.set_ylim(ymin)
+
+    ylabel = 'cumulative '+which
+    if derivative:
+        ylabel = f'new {which} per day'
     if scale_population:
-        ylabel += '/pop'
+        ylabel += ' per capita'
     if logderivative:
-        ylabel = 'doubling days ' + which
+        ylabel = f'{which} doubling days'
     ax.set_ylabel(ylabel)
     ax.tick_params(right=True, labelright=False, which='both')
 
@@ -170,17 +174,18 @@ def _plot_regions(ax, plotfunc, region_list, which, kw):
 
 def plotcountries(ax, country_list, which, **kw):
     kw.setdefault('population_df', country_populations)
-    _plot_regions(ax, plotcountry, country_list, which, kw)
+    kw.setdefault('start_date', datetime.date(2020, 3, 1))
+    _plot_regions(ax, countries_data, country_list, which, kw)
 
 def plotstates(ax, state_list, which, **kw):
     kw.setdefault('population_df', state_populations)
     kw.setdefault('start_date', datetime.date(2020, 3, 1))
-    _plot_regions(ax, plotstate, state_list, which, kw)
+    _plot_regions(ax, states_data, state_list, which, kw)
 
 def plotcounties(ax, county_list, which, **kw):
     kw.setdefault('population_df', county_populations)
     kw.setdefault('start_date', datetime.date(2020, 3, 20))
-    _plot_regions(ax, plotcounty, county_list, which, kw)
+    _plot_regions(ax, counties_data, county_list, which, kw)
 
 
 delay = 0
@@ -202,28 +207,19 @@ def _plot_delayed_death_rates(ax, region, confirmed, deaths, start_date=None, da
     delayed_ratio = deaths[delay:]/delayed_confirmed.clip(1.)
     ax.plot(delayed_confirmed, delayed_ratio, label=region)
 
-def plotcountry_delayed_death_rates(ax, country='France', start_date=None):
-    confirmed, dates = countries_data['confirmed'].data(country)
-    deaths, dates = countries_data['deaths'].data(country)
-    _plot_delayed_death_rates(ax, country, confirmed, deaths, start_date, dates)
 
-def plotstate_delayed_death_rates(ax, state='California', start_date=None):
-    confirmed, dates = states_data['confirmed'].data(state)
-    deaths, dates = states_data['deaths'].data(state)
-    _plot_delayed_death_rates(ax, state, confirmed, deaths, start_date, dates)
-
-def plotcounty_delayed_death_rates(ax, county='Contra Costa', start_date=None):
-    confirmed, dates = counties_data['confirmed'].data(county)
-    deaths, dates = counties_data['deaths'].data(county)
-    _plot_delayed_death_rates(ax, county, confirmed, deaths, start_date, dates)
-
-def _plot_regions_delayed_death_rates(ax, plotfunc, region_list, do_legend=False, start_date=None):
+def _plot_regions_delayed_death_rates(ax, dataframe_dict, region_list, do_legend=False, start_date=None,
+                                      ymax=0.2, xmin = None):
 
     for region in region_list:
-        plotfunc(ax, region, start_date)
+        confirmed, dates = dataframe_dict['confirmed'].data(region)
+        deaths, dates = dataframe_dict['deaths'].data(region)
+        _plot_delayed_death_rates(ax, region, confirmed, deaths, start_date, dates)
 
-    ax.set_xlabel('Confirmed cases')
-    ax.set_ylim(0., 0.2)
+    ax.set_xlabel('cumulative confirmed cases')
+    ax.set_ylim(0., ymax)
+    if xmin is not None:
+        ax.set_xlim(xmin)
     ax.set_xscale('log')
 
     ylabel = 'deaths/confirmed'
@@ -234,15 +230,14 @@ def _plot_regions_delayed_death_rates(ax, plotfunc, region_list, do_legend=False
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
 
-def plotcountries_delayed_death_rates(ax, country_list, do_legend=False, start_date=None):
-    _plot_regions_delayed_death_rates(ax, plotcountry_delayed_death_rates, country_list, do_legend, start_date)
+def plotcountries_delayed_death_rates(ax, country_list, do_legend=False, start_date=None, ymax=0.2, xmin=100.):
+    _plot_regions_delayed_death_rates(ax, countries_data, country_list, do_legend, start_date, ymax, xmin)
 
-def plotstates_delayed_death_rates(ax, state_list, do_legend=False, start_date=datetime.date(2020, 3, 1)):
-    _plot_regions_delayed_death_rates(ax, plotstate_delayed_death_rates, state_list, do_legend, start_date)
+def plotstates_delayed_death_rates(ax, state_list, do_legend=False, start_date=datetime.date(2020, 3, 1), ymax=0.2, xmin=100.):
+    _plot_regions_delayed_death_rates(ax, states_data, state_list, do_legend, start_date, ymax, xmin)
 
-def plotcounties_delayed_death_rates(ax, county_list, do_legend=False, start_date=datetime.date(2020, 3, 20)):
-    _plot_regions_delayed_death_rates(ax, plotcounty_delayed_death_rates, county_list, do_legend, start_date)
-
+def plotcounties_delayed_death_rates(ax, county_list, do_legend=False, start_date=datetime.date(2020, 3, 20), ymax=0.2, xmin=100.):
+    _plot_regions_delayed_death_rates(ax, counties_data, county_list, do_legend, start_date, ymax, xmin)
 
 
 ####################### Countries
@@ -260,8 +255,8 @@ fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
 plotcountries(ax[0,0], country_list_confirmed, which='confirmed', scale_population=False)
 plotcountries(ax[1,0], country_list_deaths, which='deaths', scale_population=False)
-plotcountries(ax[0,1], country_list_confirmed, which='confirmed', scale_population=True, do_legend=True)
-plotcountries(ax[1,1], country_list_deaths, which='deaths', scale_population=True, do_legend=True)
+plotcountries(ax[0,1], country_list_confirmed, which='confirmed', scale_population=True, do_legend=True, ymin=1.e-6)
+plotcountries(ax[1,1], country_list_deaths, which='deaths', scale_population=True, do_legend=True, ymin=1.e-6)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -269,11 +264,12 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.87, 0.60, 'Top 10 per capita\nwith cases > 5000,\nplus others')
-fig.text(0.87, 0.10, 'Top 10 per capita\nwith deaths > 500,\nplus others')
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 5000,\nplus others')
+fig.text(0.87, 0.12, 'Top 10 per capita\nwith deaths > 500,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/country_cases.png')
 fig.show()
 
+"""
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
 plotcountries(ax[0,0], country_list_confirmed, which='confirmed', scale_population=False, day_zero_value=100)
@@ -285,9 +281,28 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.87, 0.60, 'Top 10 per capita\nwith cases > 5000,\nplus others')
-fig.text(0.87, 0.10, 'Top 10 per capita\nwith deaths > 500,\nplus others')
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 5000,\nplus others')
+fig.text(0.87, 0.12, 'Top 10 per capita\nwith deaths > 500,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/country_cases_shifted.png')
+fig.show()
+"""
+
+fig, ax = plt.subplots(2, 2, figsize=(12,8))
+
+plotcountries(ax[0,0], country_list_confirmed, which='confirmed', scale_population=False, derivative=True, do_legend=False)
+plotcountries(ax[1,0], country_list_deaths, which='deaths', scale_population=False, derivative=True, do_legend=False)
+plotcountries(ax[0,1], country_list_confirmed, which='confirmed', scale_population=True, derivative=True, do_legend=True)
+plotcountries(ax[1,1], country_list_deaths, which='deaths', scale_population=True, derivative=True, do_legend=True)
+
+# set nice formatting and centering for dates
+fig.autofmt_xdate()
+fig.tight_layout()
+fig.subplots_adjust(bottom=.125)
+
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 5000,\nplus others')
+fig.text(0.87, 0.12, 'Top 10 per capita\nwith deaths > 500,\nplus others')
+fig.savefig('../../Dropbox/Public/COVID19/country_cases_per_day.png')
 fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
@@ -301,8 +316,8 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.80, 0.60, 'Top 10 per capita\nwith cases > 5000,\nplus others')
-fig.text(0.87, 0.10, 'Top 10 per capita\nwith deaths > 500,\nplus others')
+fig.text(0.77, 0.58, 'Top 10 per capita\nwith cases > 5000,\nplus others')
+fig.text(0.77, 0.12, 'Top 10 per capita\nwith deaths > 500,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/country_doubling_rates.png')
 fig.show()
 
@@ -318,8 +333,8 @@ if 'California' not in state_list:
     state_list.append('California')
 plotstates(ax[0,0], state_list, which='confirmed', scale_population=False)
 plotstates(ax[1,0], state_list, which='deaths', scale_population=False)
-plotstates(ax[0,1], state_list, which='confirmed', scale_population=True, do_legend=True)
-plotstates(ax[1,1], state_list, which='deaths', scale_population=True)
+plotstates(ax[0,1], state_list, which='confirmed', scale_population=True, do_legend=True, ymin=1.e-6)
+plotstates(ax[1,1], state_list, which='deaths', scale_population=True, ymin=1.e-6)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -327,10 +342,11 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.87, 0.55, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.text(0.82, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_cases.png')
 fig.show()
 
+"""
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
 plotstates(ax[0,0], state_list, which='confirmed', scale_population=False, day_zero_value=20)
@@ -342,8 +358,26 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.85, 0.55, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.text(0.82, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_cases_shifted.png')
+fig.show()
+"""
+
+fig, ax = plt.subplots(2, 2, figsize=(12,8))
+
+plotstates(ax[0,0], state_list, which='confirmed', scale_population=False, derivative=True, do_legend=False)
+plotstates(ax[1,0], state_list, which='deaths', scale_population=False, derivative=True, do_legend=False)
+plotstates(ax[0,1], state_list, which='confirmed', scale_population=True, derivative=True, do_legend=True)
+plotstates(ax[1,1], state_list, which='deaths', scale_population=True, derivative=True, do_legend=False)
+
+# set nice formatting and centering for dates
+fig.autofmt_xdate()
+fig.tight_layout()
+fig.subplots_adjust(bottom=.125)
+
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.text(0.82, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.savefig('../../Dropbox/Public/COVID19/state_cases_per_day.png')
 fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
@@ -357,7 +391,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.75, 0.55, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.text(0.75, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_doubling_rates.png')
 fig.show()
 
@@ -372,8 +406,8 @@ fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
 plotcounties(ax[0,0], county_list, which='confirmed', scale_population=False)
 plotcounties(ax[1,0], county_list, which='deaths', scale_population=False)
-plotcounties(ax[0,1], county_list, which='confirmed', scale_population=True, do_legend=True)
-plotcounties(ax[1,1], county_list, which='deaths', scale_population=True)
+plotcounties(ax[0,1], county_list, which='confirmed', scale_population=True, do_legend=True, ymin=1.e-5)
+plotcounties(ax[1,1], county_list, which='deaths', scale_population=True, ymin=1.e-6)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -381,7 +415,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.87, 0.55, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/county_cases.png')
 fig.show()
 
@@ -395,10 +429,27 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.85, 0.55, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.text(0.85, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/county_cases_shifted.png')
 fig.show()
 """
+
+fig, ax = plt.subplots(2, 2, figsize=(12,8))
+
+plotcounties(ax[0,0], county_list, which='confirmed', scale_population=False, derivative=True, do_legend=False)
+plotcounties(ax[1,0], county_list, which='deaths', scale_population=False, derivative=True, do_legend=False)
+plotcounties(ax[0,1], county_list, which='confirmed', scale_population=True, derivative=True, do_legend=True)
+plotcounties(ax[1,1], county_list, which='deaths', scale_population=True, derivative=True, do_legend=False)
+
+# set nice formatting and centering for dates
+fig.autofmt_xdate()
+fig.tight_layout()
+fig.subplots_adjust(bottom=.125)
+
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.savefig('../../Dropbox/Public/COVID19/county_cases_per_day.png')
+fig.show()
 
 fig, ax = plt.subplots(2, figsize=(7,8))
 
@@ -411,7 +462,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.80, 0.55, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.text(0.78, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/county_doubling_rates.png')
 fig.show()
 
@@ -421,8 +472,8 @@ fig.show()
 fig, ax = plt.subplots(3, figsize=(12,8))
 
 plotcountries_delayed_death_rates(ax[0], country_list_deaths, do_legend=True)
-plotstates_delayed_death_rates(ax[1], state_list, do_legend=True)
-plotcounties_delayed_death_rates(ax[2], county_list, do_legend=True)
+plotstates_delayed_death_rates(ax[1], state_list, do_legend=True, ymax=0.1)
+plotcounties_delayed_death_rates(ax[2], county_list, do_legend=True, ymax=0.1)
 
 fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
