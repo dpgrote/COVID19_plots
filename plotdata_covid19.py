@@ -7,6 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from TimeSeries import TimeSeriesCountries, TimeSeriesStates, TimeSeriesCounties
+from California_data import CaliforniaData
 
 matplotlib.interactive(True)
 
@@ -53,6 +54,8 @@ states_data    = {'confirmed':TimeSeriesStates(which='confirmed'),
                   'deaths':TimeSeriesStates(which='deaths')}
 counties_data  = {'confirmed':TimeSeriesCounties(which='confirmed'),
                   'deaths':TimeSeriesCounties(which='deaths')}
+
+california_data = CaliforniaData()
 
 country_populations = pandas.read_csv('country_populations.csv')
 state_populations = pandas.read_csv('state_populations.csv')
@@ -131,16 +134,17 @@ def _plot_region(ax, region, cases, dates, kw):
     ax.plot(dates, cases, label=region)
 
 
-def _plot_regions(ax, dataframe_dict, region_list, which, kw):
+def _plot_regions(ax, dataframe, region_list, which, kw):
     scale_population = kw.get('scale_population', False)
     logderivative = kw.get('logderivative', False)
     derivative = kw.get('derivative', False)
     day_zero_value = kw.get('day_zero_value', None)
     do_legend = kw.get('do_legend', False)
     ymin = kw.get('ymin', None)
+    ylabel = kw.get('ylabel', None)
 
     for region in region_list:
-        cases, dates = dataframe_dict[which].data(region)
+        cases, dates = dataframe.data(region, which)
         _plot_region(ax, region, cases, dates, kw)
 
     if day_zero_value is None:
@@ -153,18 +157,21 @@ def _plot_regions(ax, dataframe_dict, region_list, which, kw):
     if logderivative or derivative:
         ax.set_ylim(0.)
     else:
-        ax.set_yscale('log')
+        #ax.set_yscale('log')
+        ax.set_yscale('linear')
 
     if ymin is not None:
         ax.set_ylim(ymin)
+    ax.set_ylim(0.)
 
-    ylabel = 'cumulative '+which
-    if derivative:
-        ylabel = f'new {which} per day'
-    if scale_population:
-        ylabel += ' per capita'
-    if logderivative:
-        ylabel = f'{which} doubling days'
+    if ylabel is None:
+        ylabel = 'cumulative '+which
+        if derivative:
+            ylabel = f'new {which} per day'
+        if scale_population:
+            ylabel += ' per capita'
+        if logderivative:
+            ylabel = f'{which} doubling days'
     ax.set_ylabel(ylabel)
     ax.tick_params(right=True, labelright=False, which='both')
 
@@ -175,17 +182,20 @@ def _plot_regions(ax, dataframe_dict, region_list, which, kw):
 def plotcountries(ax, country_list, which, **kw):
     kw.setdefault('population_df', country_populations)
     kw.setdefault('start_date', datetime.date(2020, 3, 1))
-    _plot_regions(ax, countries_data, country_list, which, kw)
+    _plot_regions(ax, countries_data[which], country_list, which, kw)
 
 def plotstates(ax, state_list, which, **kw):
     kw.setdefault('population_df', state_populations)
     kw.setdefault('start_date', datetime.date(2020, 3, 1))
-    _plot_regions(ax, states_data, state_list, which, kw)
+    _plot_regions(ax, states_data[which], state_list, which, kw)
 
 def plotcounties(ax, county_list, which, **kw):
+    dataframe = kw.get('dataframe', None)
+    if dataframe is None:
+        dataframe = counties_data[which]
     kw.setdefault('population_df', county_populations)
     kw.setdefault('start_date', datetime.date(2020, 3, 20))
-    _plot_regions(ax, counties_data, county_list, which, kw)
+    _plot_regions(ax, dataframe, county_list, which, kw)
 
 
 delay = 0
@@ -240,6 +250,67 @@ def plotcounties_delayed_death_rates(ax, county_list, do_legend=False, start_dat
     _plot_regions_delayed_death_rates(ax, counties_data, county_list, do_legend, start_date, ymax, xmin)
 
 
+trajectory_days = 7
+def _plot_region_trajectory(ax, region, cases, kw):
+    scale_population = kw.get('scale_population', False)
+    population_df = kw.get('population_df', None)
+    nsmooth = kw.get('nsmooth', None)
+
+    if scale_population:
+        population = int(population_df[population_df['Name'] == region]['Population'])
+        cases /= population
+
+    ax.plot(cases[trajectory_days:], cases[trajectory_days:] - cases[:-trajectory_days], label=region)
+
+
+def _plot_regions_trajectory(ax, dataframe, region_list, which, kw):
+    scale_population = kw.get('scale_population', False)
+    do_legend = kw.get('do_legend', False)
+    xymin = kw.get('xymin', None)
+
+    for region in region_list:
+        cases, dates = dataframe.data(region, which)
+        _plot_region_trajectory(ax, region, cases, kw)
+
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+
+    if xymin is not None:
+        ax.set_xlim(xymin)
+        ax.set_ylim(xymin)
+
+    xlabel = f'Total {which}'
+    ylabel = f'{which.capitalize()} last {trajectory_days} days'
+
+    if scale_population:
+        xlabel += ' per capita'
+        ylabel += ' per capita'
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    ax.tick_params(right=True, labelright=False, which='both')
+
+    if do_legend:
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+
+
+def plotcountries_trajectory(ax, country_list, which, **kw):
+    kw.setdefault('population_df', country_populations)
+    _plot_regions_trajectory(ax, countries_data[which], country_list, which, kw)
+
+def plotstates_trajectory(ax, state_list, which, **kw):
+    kw.setdefault('population_df', state_populations)
+    _plot_regions_trajectory(ax, states_data[which], state_list, which, kw)
+
+def plotcounties_trajectory(ax, county_list, which, **kw):
+    dataframe = kw.get('dataframe', None)
+    if dataframe is None:
+        dataframe = counties_data[which]
+    kw.setdefault('population_df', county_populations)
+    _plot_regions_trajectory(ax, dataframe, county_list, which, kw)
+
+
 ####################### Countries
 country_list_confirmed = countries_data['confirmed'].find_maxes(population_df=country_populations, mincases=5000)
 for country in ['US', 'China', 'Korea, South']:
@@ -267,6 +338,22 @@ fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
 fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 5000,\nplus others')
 fig.text(0.87, 0.12, 'Top 10 per capita\nwith deaths > 500,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/country_cases.png')
+fig.show()
+
+fig, ax = plt.subplots(2, 2, figsize=(12,8))
+
+plotcountries_trajectory(ax[0,0], country_list_confirmed, which='confirmed', scale_population=False, xymin=100.)
+plotcountries_trajectory(ax[1,0], country_list_deaths, which='deaths', scale_population=False, xymin=100.)
+plotcountries_trajectory(ax[0,1], country_list_confirmed, which='confirmed', scale_population=True, xymin=1.e-6, do_legend=True)
+plotcountries_trajectory(ax[1,1], country_list_deaths, which='deaths', scale_population=True, xymin=1.e-6, do_legend=True)
+
+fig.tight_layout()
+fig.subplots_adjust(bottom=.125)
+
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 5000,\nplus others')
+fig.text(0.87, 0.12, 'Top 10 per capita\nwith deaths > 500,\nplus others')
+fig.savefig('../../Dropbox/Public/COVID19/country_trajectories.png')
 fig.show()
 
 """
@@ -329,8 +416,6 @@ if 'California' not in state_list:
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-if 'California' not in state_list:
-    state_list.append('California')
 plotstates(ax[0,0], state_list, which='confirmed', scale_population=False)
 plotstates(ax[1,0], state_list, which='deaths', scale_population=False)
 plotstates(ax[0,1], state_list, which='confirmed', scale_population=True, do_legend=True, ymin=1.e-6)
@@ -344,6 +429,21 @@ fig.subplots_adjust(bottom=.125)
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
 fig.text(0.82, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_cases.png')
+fig.show()
+
+fig, ax = plt.subplots(2, 2, figsize=(12,8))
+
+plotstates_trajectory(ax[0,0], state_list, which='confirmed', scale_population=False, xymin=100)
+plotstates_trajectory(ax[1,0], state_list, which='deaths', scale_population=False, xymin=100)
+plotstates_trajectory(ax[0,1], state_list, which='confirmed', scale_population=True, do_legend=True, xymin=1.e-6)
+plotstates_trajectory(ax[1,1], state_list, which='deaths', scale_population=True, xymin=1.e-6)
+
+fig.tight_layout()
+fig.subplots_adjust(bottom=.125)
+
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.text(0.82, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.savefig('../../Dropbox/Public/COVID19/state_trajectories.png')
 fig.show()
 
 """
@@ -419,6 +519,21 @@ fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/county_cases.png')
 fig.show()
 
+fig, ax = plt.subplots(2, 2, figsize=(12,8))
+
+plotcounties_trajectory(ax[0,0], county_list, which='confirmed', scale_population=False, xymin=1)
+plotcounties_trajectory(ax[1,0], county_list, which='deaths', scale_population=False, xymin=1)
+plotcounties_trajectory(ax[0,1], county_list, which='confirmed', scale_population=True, do_legend=True, xymin=1.e-6)
+plotcounties_trajectory(ax[1,1], county_list, which='deaths', scale_population=True, xymin=1.e-6)
+
+fig.tight_layout()
+fig.subplots_adjust(bottom=.125)
+
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.savefig('../../Dropbox/Public/COVID19/county_trajectories.png')
+fig.show()
+
 """
 fig, ax = plt.subplots(2, figsize=(7,8))
 
@@ -466,6 +581,28 @@ fig.text(0.78, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/county_doubling_rates.png')
 fig.show()
 
+
+# -------- with hospitalization counts
+county_list = california_data.find_maxes(which='COVID-19 Positive Patients', scale_population=True, mincases=50)
+if 'Contra Costa' not in county_list:
+    county_list.append('Contra Costa')
+
+fig, ax = plt.subplots(2, 2, figsize=(12,8))
+
+plotcounties(ax[0,0], county_list, dataframe=california_data, which='COVID-19 Positive Patients', scale_population=True, ylabel='New confirmed patients per capita')
+plotcounties(ax[1,0], county_list, dataframe=california_data, which='ICU COVID-19 Positive Patients', scale_population=True, ylabel='New confirmed ICU patients per capita')
+plotcounties(ax[0,1], county_list, dataframe=california_data, which='Suspected COVID-19 Positive Patients', scale_population=True, do_legend=True, ylabel='New suspected patients per capita')
+plotcounties(ax[1,1], county_list, dataframe=california_data, which='ICU COVID-19 Suspected Patients', scale_population=True, ylabel='New suspected ICU patients per capita')
+
+# set nice formatting and centering for dates
+fig.autofmt_xdate()
+fig.tight_layout()
+fig.subplots_adjust(bottom=.125)
+
+fig.suptitle('data from https://data.chhs.ca.gov', y=0.02)
+fig.text(0.87, 0.58, 'Top 10 per capita\nwith cases > 100,\nplus others')
+fig.savefig('../../Dropbox/Public/COVID19/county_hospitalization.png')
+fig.show()
 
 ####################### Death rates
 

@@ -27,7 +27,7 @@ class _TimeSeriesBase(object):
         "Allows inheritors to down select based on other criteria"
         return self.dataframe
 
-    def data(self, region):
+    def data(self, region, which=None):
         dataframe = self.select_area()
         df = dataframe[dataframe[self.region_column] == region]
         alldata = df.to_numpy()[:,self.first_keys:].astype(float)
