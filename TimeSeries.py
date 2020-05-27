@@ -39,6 +39,8 @@ class _TimeSeriesBase(object):
         maxcases = []
         dataframe = self.select_area()
         for region in dataframe[self.region_column].unique():
+            if region == 'Qatar':
+                continue
             # Get cases on most recent day
             allcases, dates = self.data(region)
             cases = allcases[-1]
@@ -72,6 +74,15 @@ class TimeSeriesCountries(_TimeSeriesBase):
     def __init__(self, which):
         _TimeSeriesBase.__init__(self, which, region='global', first_keys=4)
         self.region_column = 'Country/Region'
+
+    def data(self, region, which=None):
+        if region == 'World':
+            dataframe = self.select_area()
+            alldata = dataframe.to_numpy()[:,self.first_keys:].astype(float)
+            data = alldata.sum(axis=0)
+            return data, self.dates
+        else:
+            return _TimeSeriesBase.data(self, region, which)
 
 
 class TimeSeriesStates(_TimeSeriesBase):
