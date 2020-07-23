@@ -34,7 +34,7 @@ class _TimeSeriesBase(object):
         data = alldata.sum(axis=0)
         return data, self.dates
 
-    def find_maxes(self, ncases=10, population_df=None, mincases=0):
+    def find_maxes(self, ncases=10, population_df=None, mincases=0, derivative=False):
         maxregions = []
         maxcases = []
         dataframe = self.select_area()
@@ -43,8 +43,11 @@ class _TimeSeriesBase(object):
                 continue
             # Get cases on most recent day
             allcases, dates = self.data(region)
-            cases = allcases[-1]
-            if cases < mincases:
+            if derivative:
+                cases = allcases[-1] - allcases[-2]
+            else:
+                cases = allcases[-1]
+            if allcases[-1] < mincases:
                 continue
             if population_df is not None:
                 population = population_df[population_df['Name'] == region]['Population']

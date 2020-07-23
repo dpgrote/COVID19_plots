@@ -307,14 +307,14 @@ def plotcounties_trajectory(ax, county_list, which, **kw):
 
 
 ####################### Countries
-mincases = 30000
-mindeaths = 500
-country_list_confirmed = countries_data['confirmed'].find_maxes(population_df=country_populations, mincases=mincases)
+mincases = 60000
+mindeaths = 1500
+country_list_confirmed = countries_data['confirmed'].find_maxes(population_df=country_populations, mincases=mincases, derivative=True)
 for country in ['US', 'China', 'Korea, South', 'Sweden']:
     if country not in country_list_confirmed:
         country_list_confirmed.append(country)
 
-country_list_deaths = countries_data['deaths'].find_maxes(population_df=country_populations, mincases=mindeaths)
+country_list_deaths = countries_data['deaths'].find_maxes(population_df=country_populations, mincases=mindeaths, derivative=True)
 for country in ['US', 'China', 'Korea, South', 'Sweden']:
     if country not in country_list_deaths:
         country_list_deaths.append(country)
@@ -387,6 +387,7 @@ ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
 plotcountries(ax[0,1], country_list_confirmed, which='confirmed', scale_population=True, derivative=True, do_legend=False)
 plotcountries(ax[0,1], ['World'], which='confirmed', scale_population=True, derivative=True, do_legend=True, line_color='k--')
+ax[0,1].set_ylim(0., 0.0003)
 plotcountries(ax[1,1], country_list_deaths, which='deaths', scale_population=True, derivative=True, do_legend=False)
 plotcountries(ax[1,1], ['World'], which='deaths', scale_population=True, derivative=True, do_legend=True, line_color='k--')
 ax[1,1].set_ylim(None, 1.e-5)
@@ -420,8 +421,8 @@ fig.show()
 
 
 ####################### States
-mincases = 100
-state_list = states_data['confirmed'].find_maxes(population_df=state_populations, mincases=mincases)
+mincases = 1000
+state_list = states_data['confirmed'].find_maxes(population_df=state_populations, mincases=mincases, derivative=True)
 if 'California' not in state_list:
     state_list.append('California')
 if 'Georgia' not in state_list:
@@ -447,7 +448,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.82, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
+fig.text(0.87, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_cases.png')
 fig.show()
 
@@ -462,7 +463,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.82, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
+fig.text(0.87, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_trajectories.png')
 fig.show()
 
@@ -478,7 +479,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.82, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
+fig.text(0.87, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_cases_shifted.png')
 fig.show()
 """
@@ -502,7 +503,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.82, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
+fig.text(0.87, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_cases_per_day.png')
 fig.show()
 
@@ -517,14 +518,15 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.75, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
+fig.text(0.77, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/state_doubling_rates.png')
 fig.show()
 
 
 ####################### Counties
 mincases = 100
-county_list = counties_data['confirmed'].find_maxes(population_df=county_populations, mincases=mincases)
+#county_list = counties_data['confirmed'].find_maxes(population_df=county_populations, mincases=mincases, derivative=True)
+county_list = counties_data['confirmed'].find_maxes(mincases=mincases, derivative=True)
 if 'Contra Costa' not in county_list:
     county_list.append('Contra Costa')
 if 'Alameda' not in county_list:
@@ -578,7 +580,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.85, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
+fig.text(0.87, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/county_cases_shifted.png')
 fig.show()
 """
@@ -593,10 +595,10 @@ ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
 plotcounties(ax[0,1], county_list, which='confirmed', scale_population=True, derivative=True, do_legend=False)
 plotstates(ax[0,1], ['California'], which='confirmed', scale_population=True, derivative=True, do_legend=True, line_color='k--', start_date=datetime.date(2020, 3, 20))
-ax[0,1].set_ylim(None, 0.00015)
+#ax[0,1].set_ylim(None, 0.0004)
 plotcounties(ax[1,1], county_list, which='deaths', scale_population=True, derivative=True, do_legend=False)
 plotstates(ax[1,1], ['California'], which='deaths', scale_population=True, derivative=True, do_legend=False, line_color='k--', start_date=datetime.date(2020, 3, 20))
-ax[1,1].set_ylim(None, 5.e-6)
+ax[1,1].set_ylim(None, 8.e-6)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -619,7 +621,7 @@ fig.tight_layout()
 fig.subplots_adjust(bottom=.125)
 
 fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
-fig.text(0.78, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
+fig.text(0.77, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 fig.savefig('../../Dropbox/Public/COVID19/county_doubling_rates.png')
 fig.show()
 

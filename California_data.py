@@ -26,7 +26,7 @@ class CaliforniaData(object):
         #   ICU COVID-19 Positive Patients
         #   ICU COVID-19 Suspected Patients
         df = self.dataframe[self.dataframe['County Name'] == county]
-        dates = [datetime.strptime(d, "%m/%d/%Y").date() for d in df['Most Recent Date'].array]
+        dates = [datetime.strptime(d, "%Y-%m-%dT00:00:00").date() for d in df['Most Recent Date'].array]
         results = df[which].to_numpy(dtype=float)
         return results, dates
 
