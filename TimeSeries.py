@@ -6,6 +6,7 @@ import numpy as np
 from datetime import datetime
 import matplotlib
 import matplotlib.pyplot as plt
+import state_codes
 
 matplotlib.interactive(True)
 
@@ -24,7 +25,7 @@ class _TimeSeriesPlotter(object):
         derivative = kw.get('derivative', False)
         day_zero_value = kw.get('day_zero_value', None)
         start_date = kw.get('start_date', None)
-        nsmooth = kw.get('nsmooth', 5)
+        nsmooth = kw.get('nsmooth', 15)
         doubling_days_max = kw.get('doubling_days_max', 40.)
         line_color = kw.get('line_color', None)
 
@@ -121,7 +122,6 @@ class _TimeSeriesPlotter(object):
 
     def plot_region_trajectory(self, ax, region, trajectory_days, kw):
         scale_population = kw.get('scale_population', False)
-        population_df = kw.get('population_df', None)
         nsmooth = kw.get('nsmooth', None)
 
         cases, dates = self.data(region)
@@ -164,6 +164,113 @@ class _TimeSeriesPlotter(object):
         if do_legend:
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
+    def map_region_name(self, region):
+        return region
+
+    def scatter_plot(self, ax, region_list, since_days=None):
+        current_cases_min = 10000000
+        current_cases_max = 0
+        current_cases_scaled_min = 0
+        current_cases_scaled_max = 0
+        for region in region_list:
+            cases, dates = self.data(region)
+            if since_days is None:
+                current_cases = cases[-1]
+            else:
+                current_cases = cases[-1] - cases[-since_days-1]
+            population = int(self.populations[self.populations['Name'] == region]['Population'])
+            current_cases_scaled = current_cases/population
+            name = self.map_region_name(region)
+            if name is None:
+                continue
+            ax.text(current_cases, current_cases_scaled, name,
+                    horizontalalignment = 'center',
+                    verticalalignment = 'center')
+            current_cases_min = min(current_cases_min, current_cases)
+            current_cases_max = max(current_cases_max, current_cases)
+            current_cases_scaled_max = max(current_cases_scaled_max, current_cases_scaled)
+        current_cases_min = 10.**(int(np.log10(current_cases_min)))
+        current_cases_max = 10.**(int(np.log10(current_cases_max))+1)
+        ax.set_xlim(current_cases_min, current_cases_max)
+        ax.set_ylim(current_cases_scaled_min, current_cases_scaled_max*1.1)
+        ax.set_xlabel(f'{self.which.capitalize()}')
+        ax.set_ylabel(f'{self.which.capitalize()} per capita')
+        ax.set_xscale('log')
+
+        ax.tick_params(right=True, labelright=False, which='both')
+
+    def plot_regions_rate_change(self, ax, region_list, **kw):
+        scale_population = kw.get('scale_population', True)
+        trajectory_days = kw.get('trajectory_days', 7)
+
+        cases_min = 1.e10
+        cases_max = 0.
+
+        for region in region_list:
+            name = self.map_region_name(region)
+            if name is None:
+                continue
+    
+            cases, dates = self.data(region)
+            last_week_cases = (cases[-1] - cases[-trajectory_days-1])/trajectory_days
+            previous_week_cases = (cases[-trajectory_days-1] - cases[-2*trajectory_days-1])/trajectory_days
+
+            if scale_population:
+                population = int(self.populations[self.populations['Name'] == region]['Population'])
+                last_week_cases /= population
+                previous_week_cases /= population
+
+            cases_min = min(last_week_cases, cases_min)
+            cases_min = min(previous_week_cases, cases_min)
+            cases_max = max(last_week_cases, cases_max)
+            cases_max = max(previous_week_cases, cases_max)
+
+            color = 'k'
+            if region in ['US', 'California', 'Contra Costa', 'Alameda']:
+                color = 'r'
+            ax.text(last_week_cases, previous_week_cases, name,
+                    horizontalalignment = 'center',
+                    verticalalignment = 'center',
+                    color = color)
+            ax.plot(last_week_cases, previous_week_cases, 'ro')
+
+            if region in ['California']:
+                t = trajectory_days
+                last_week_cases = (cases[-t-1:] - cases[-2*t-1:-t])/t
+                previous_week_cases = (cases[-2*t-1:-t] - cases[-3*t-1:-2*t])/t
+
+                if scale_population:
+                    last_week_cases /= population
+                    previous_week_cases /= population
+
+                ax.plot(last_week_cases, previous_week_cases, 'r')
+
+        if not scale_population:
+            cases_min = max(1., cases_min)
+            cases_min = 10.**(int(np.log10(cases_min))  )
+            cases_max = 10.**(int(np.log10(cases_max))+1)
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+        else:
+            base = 10.**(np.floor(np.log10(cases_max)))
+            cases_max = base*(np.floor(cases_max/base) + 1)
+            cases_min = 0.
+
+        ax.set_xlim(cases_min, cases_max)
+        ax.set_ylim(cases_min, cases_max)
+        ax.plot([cases_min, cases_max], [cases_min, cases_max], 'r')
+
+        xlabel = f'Most recent week {self.which} per day'
+        ylabel = f'Two weeks ago {self.which} per day'
+
+        if scale_population:
+            xlabel += ' per capita'
+            ylabel += ' per capita'
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+
+        ax.tick_params(right=True, labelright=False, which='both')
 
 class _TimeSeriesBase(_TimeSeriesPlotter):
     """Reads csv files from csse_covid_19_data/csse_covid_19_time_series
@@ -262,6 +369,12 @@ class TimeSeriesStates(_TimeSeriesBase):
         self.region_column = 'Province_State'
         self.populations = pandas.read_csv('state_populations.csv')
 
+    def map_region_name(self, region):
+        try:
+            result = state_codes.state_codes[region]
+        except KeyError:
+            result = None
+        return result
 
 class TimeSeriesCounties(_TimeSeriesBase):
     """Handles time series data for counties
