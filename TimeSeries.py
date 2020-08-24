@@ -232,7 +232,6 @@ class _TimeSeriesPlotter(object):
                     horizontalalignment = 'center',
                     verticalalignment = 'center',
                     color = color)
-            ax.plot(last_week_cases, previous_week_cases, 'ro')
 
             if region in ['California']:
                 t = trajectory_days
