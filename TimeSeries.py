@@ -25,6 +25,7 @@ class _TimeSeriesPlotter(object):
         derivative = kw.get('derivative', False)
         day_zero_value = kw.get('day_zero_value', None)
         start_date = kw.get('start_date', None)
+        number_of_days = kw.get('number_of_days', None)
         nsmooth = kw.get('nsmooth', 15)
         doubling_days_max = kw.get('doubling_days_max', 40.)
         line_color = kw.get('line_color', None)
@@ -80,6 +81,9 @@ class _TimeSeriesPlotter(object):
             ii = np.nonzero(np.greater(dates, start_date))[0]
             cases = cases[ii]
             dates = np.take(dates, ii)
+        elif number_of_days is not None:
+            cases = cases[-number_of_days:]
+            dates = dates[-number_of_days:]
 
         if line_color is None:
             ax.plot(dates, cases, label=region)
@@ -233,7 +237,7 @@ class _TimeSeriesPlotter(object):
                     verticalalignment = 'center',
                     color = color)
 
-            if region in ['California']:
+            if region in ['US', 'California', 'Contra Costa', 'Alameda', 'Spain']:
                 t = trajectory_days
                 last_week_cases = (cases[-t-1:] - cases[-2*t-1:-t])/t
                 previous_week_cases = (cases[-2*t-1:-t] - cases[-3*t-1:-2*t])/t
@@ -242,7 +246,7 @@ class _TimeSeriesPlotter(object):
                     last_week_cases /= population
                     previous_week_cases /= population
 
-                ax.plot(last_week_cases, previous_week_cases, 'r')
+                ax.plot(last_week_cases, previous_week_cases, color)
 
         if not scale_population:
             cases_min = max(1., cases_min)
@@ -252,12 +256,21 @@ class _TimeSeriesPlotter(object):
             ax.set_yscale('log')
         else:
             base = 10.**(np.floor(np.log10(cases_max)))
-            cases_max = base*(np.floor(cases_max/base) + 1)
+            cases_max = base*(np.floor(5*cases_max/base) + 1)/5
             cases_min = 0.
 
         ax.set_xlim(cases_min, cases_max)
         ax.set_ylim(cases_min, cases_max)
         ax.plot([cases_min, cases_max], [cases_min, cases_max], 'r')
+
+        ax.text(cases_max/2., cases_max*0.97, 'Improving',
+                horizontalalignment = 'center',
+                verticalalignment = 'center',
+                color = 'r')
+        ax.text(cases_max/2., cases_max*0.03, 'Worsening',
+                horizontalalignment = 'center',
+                verticalalignment = 'center',
+                color = 'r')
 
         xlabel = f'Most recent week {self.which} per day'
         ylabel = f'Two weeks ago {self.which} per day'
@@ -300,7 +313,7 @@ class _TimeSeriesBase(_TimeSeriesPlotter):
         data = alldata.sum(axis=0)
         return data, self.dates
 
-    def find_maxes(self, ncases=10, scale_population=False,  mincases=0, derivative=False):
+    def find_maxes(self, ncases=10, scale_population=False,  mincases=0, derivative=False, min_population=0):
         maxregions = []
         maxcases = []
         dataframe = self.select_area()
@@ -315,11 +328,13 @@ class _TimeSeriesBase(_TimeSeriesPlotter):
                 cases = allcases[-1]
             if allcases[-1] < mincases:
                 continue
+            population = self.populations[self.populations['Name'] == region]['Population']
+            if len(population) == 0:
+                continue
+            population = float(population)
+            if population < min_population:
+                continue
             if scale_population:
-                population = self.populations[self.populations['Name'] == region]['Population']
-                if len(population) == 0:
-                    continue
-                population = float(population)
                 cases = cases/population
             if len(maxcases) < ncases:
                 maxregions.append(region)

@@ -63,7 +63,7 @@ states_data    = {'confirmed':TimeSeriesStates(which='confirmed'),
 counties_data  = {'confirmed':TimeSeriesCounties(which='confirmed'),
                   'deaths':TimeSeriesCounties(which='deaths')}
 
-california_data = CaliforniaData()
+#california_data = CaliforniaData()
 
 country_populations = pandas.read_csv('country_populations.csv')
 state_populations = pandas.read_csv('state_populations.csv')
@@ -138,17 +138,18 @@ if plot_time_shifted:
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
+number_of_days = 30
 countries_data['confirmed'].plot_regions(ax[0,0], country_list_confirmed, scale_population=False, derivative=True, do_legend=False)
 ax[0,0].set_ylim(1.)
 ax[0,0].set_yscale('log')
 countries_data['deaths'].plot_regions(ax[1,0], country_list_deaths, scale_population=False, derivative=True, do_legend=False)
 ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
-countries_data['confirmed'].plot_regions(ax[0,1], country_list_confirmed, scale_population=True, derivative=True, do_legend=False)
-countries_data['confirmed'].plot_regions(ax[0,1], ['World'], scale_population=True, derivative=True, do_legend=True, line_color='k--')
+countries_data['confirmed'].plot_regions(ax[0,1], country_list_confirmed, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+countries_data['confirmed'].plot_regions(ax[0,1], ['World'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
 ax[0,1].set_ylim(0., 0.0003)
-countries_data['deaths'].plot_regions(ax[1,1], country_list_deaths, scale_population=True, derivative=True, do_legend=False)
-countries_data['deaths'].plot_regions(ax[1,1], ['World'], scale_population=True, derivative=True, do_legend=True, line_color='k--')
+countries_data['deaths'].plot_regions(ax[1,1], country_list_deaths, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+countries_data['deaths'].plot_regions(ax[1,1], ['World'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
 ax[1,1].set_ylim(None, 1.e-5)
 
 # set nice formatting and centering for dates
@@ -170,7 +171,7 @@ if plot_doubling_rates:
     plot_finish(fig, 'country_doubling_rates.png')
 
 # Plot change of rate
-country_list = countries_data['confirmed'].find_maxes(scale_population=True, derivative=False, ncases=30)
+country_list = countries_data['confirmed'].find_maxes(scale_population=True, derivative=False, ncases=30, min_population=1.e7)
 fig, ax = plt.subplots(1, figsize=(12,8))
 countries_data['confirmed'].plot_regions_rate_change(ax, country_list, scale_population=True)
 plot_finish(fig, 'country_change_of_rate_confirmed_plot.png')
@@ -239,10 +240,10 @@ ax[0,0].set_yscale('log')
 states_data['deaths'].plot_regions(ax[1,0], state_list, scale_population=False, derivative=True, do_legend=False)
 ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
-states_data['confirmed'].plot_regions(ax[0,1], state_list, scale_population=True, derivative=True, do_legend=False)
-countries_data['confirmed'].plot_regions(ax[0,1], ['US'], scale_population=True, derivative=True, do_legend=True, line_color='k--')
-states_data['deaths'].plot_regions(ax[1,1], state_list, scale_population=True, derivative=True, do_legend=False)
-countries_data['deaths'].plot_regions(ax[1,1], ['US'], scale_population=True, derivative=True, do_legend=False, line_color='k--')
+states_data['confirmed'].plot_regions(ax[0,1], state_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+countries_data['confirmed'].plot_regions(ax[0,1], ['US'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
+states_data['deaths'].plot_regions(ax[1,1], state_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+countries_data['deaths'].plot_regions(ax[1,1], ['US'], scale_population=True, derivative=True, do_legend=False, line_color='k--', number_of_days=number_of_days)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -345,11 +346,11 @@ ax[0,0].set_yscale('log')
 counties_data['deaths'].plot_regions(ax[1,0], county_list, scale_population=False, derivative=True, do_legend=False)
 ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
-counties_data['confirmed'].plot_regions(ax[0,1], county_list, scale_population=True, derivative=True, do_legend=False)
-states_data['confirmed'].plot_regions(ax[0,1], ['California'], scale_population=True, derivative=True, do_legend=True, line_color='k--', start_date=datetime.date(2020, 3, 20))
+counties_data['confirmed'].plot_regions(ax[0,1], county_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+states_data['confirmed'].plot_regions(ax[0,1], ['California'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
 #ax[0,1].set_ylim(None, 0.0004)
-counties_data['deaths'].plot_regions(ax[1,1], county_list, scale_population=True, derivative=True, do_legend=False)
-states_data['deaths'].plot_regions(ax[1,1], ['California'], scale_population=True, derivative=True, do_legend=False, line_color='k--', start_date=datetime.date(2020, 3, 20))
+counties_data['deaths'].plot_regions(ax[1,1], county_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+states_data['deaths'].plot_regions(ax[1,1], ['California'], scale_population=True, derivative=True, do_legend=False, line_color='k--', number_of_days=number_of_days)
 ax[1,1].set_ylim(None, 8.e-6)
 
 # set nice formatting and centering for dates
