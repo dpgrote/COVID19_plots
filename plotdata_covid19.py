@@ -79,31 +79,43 @@ def plot_finish(fig, png_name):
     fig.savefig(f'../../Dropbox/Public/COVID19/{png_name}')
     fig.show()
 
+def generate_colors(ncolors):
+    'Generate random colors'
+    levels = np.linspace(0., 1., ncolors)
+    rng = np.random.default_rng()
+    reds = rng.permutation(levels)
+    greens = rng.permutation(levels)
+    blues = rng.permutation(levels)
+    return [(reds[i], greens[i], blues[i]) for i in range(ncolors)]
+
 
 ####################### Countries
-mincases = 60000
-mindeaths = 1500
-country_list_confirmed = countries_data['confirmed'].find_maxes(scale_population=True, mincases=mincases, derivative=True)
-for country in ['US', 'China', 'Korea, South', 'Sweden']:
+mincases = 200000
+mindeaths = 10000
+country_list_confirmed = countries_data['confirmed'].find_maxes(scale_population=True, mincases=mincases, derivative=False)
+for country in ['US', 'China', 'Korea, South', 'Sweden', 'Germany']:
     if country not in country_list_confirmed:
         country_list_confirmed.append(country)
 
-country_list_deaths = countries_data['deaths'].find_maxes(scale_population=True, mincases=mindeaths, derivative=True)
-for country in ['US', 'China', 'Korea, South', 'Sweden']:
+country_list_deaths = countries_data['deaths'].find_maxes(scale_population=True, mincases=mindeaths, derivative=False)
+for country in ['US', 'China', 'Korea, South', 'Sweden', 'Germany']:
     if country not in country_list_deaths:
         country_list_deaths.append(country)
 
+color_list_confirmed = generate_colors(len(country_list_confirmed))
+color_list_deaths = generate_colors(len(country_list_deaths))
+
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-countries_data['confirmed'].plot_regions(ax[0,0], country_list_confirmed, scale_population=False)
+countries_data['confirmed'].plot_regions(ax[0,0], country_list_confirmed, scale_population=False, color_list=color_list_confirmed)
 ax[0,0].set_ylim(1.e4)
 ax[0,0].set_yscale('log')
-countries_data['deaths'].plot_regions(ax[1,0], country_list_deaths, scale_population=False)
+countries_data['deaths'].plot_regions(ax[1,0], country_list_deaths, scale_population=False, color_list=color_list_deaths)
 ax[1,0].set_ylim(1.e2)
 ax[1,0].set_yscale('log')
-countries_data['confirmed'].plot_regions(ax[0,1], country_list_confirmed, scale_population=True, do_legend=False)
+countries_data['confirmed'].plot_regions(ax[0,1], country_list_confirmed, scale_population=True, do_legend=False, color_list=color_list_confirmed)
 countries_data['confirmed'].plot_regions(ax[0,1], ['World'], scale_population=True, do_legend=True, line_color='k--')
-countries_data['deaths'].plot_regions(ax[1,1], country_list_deaths, scale_population=True, do_legend=False)
+countries_data['deaths'].plot_regions(ax[1,1], country_list_deaths, scale_population=True, do_legend=False, color_list=color_list_deaths)
 countries_data['deaths'].plot_regions(ax[1,1], ['World'], scale_population=True, do_legend=True, line_color='k--')
 
 # set nice formatting and centering for dates
@@ -139,18 +151,18 @@ if plot_time_shifted:
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
 number_of_days = 30
-countries_data['confirmed'].plot_regions(ax[0,0], country_list_confirmed, scale_population=False, derivative=True, do_legend=False)
+countries_data['confirmed'].plot_regions(ax[0,0], country_list_confirmed, scale_population=False, derivative=True, do_legend=False, color_list=color_list_confirmed)
 ax[0,0].set_ylim(1.)
 ax[0,0].set_yscale('log')
-countries_data['deaths'].plot_regions(ax[1,0], country_list_deaths, scale_population=False, derivative=True, do_legend=False)
+countries_data['deaths'].plot_regions(ax[1,0], country_list_deaths, scale_population=False, derivative=True, do_legend=False, color_list=color_list_deaths)
 ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
-countries_data['confirmed'].plot_regions(ax[0,1], country_list_confirmed, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+countries_data['confirmed'].plot_regions(ax[0,1], country_list_confirmed, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days, color_list=color_list_confirmed)
 countries_data['confirmed'].plot_regions(ax[0,1], ['World'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
-ax[0,1].set_ylim(0., 0.0003)
-countries_data['deaths'].plot_regions(ax[1,1], country_list_deaths, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+ax[0,1].set_ylim(0., 0.0010)
+countries_data['deaths'].plot_regions(ax[1,1], country_list_deaths, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days, color_list=color_list_deaths)
 countries_data['deaths'].plot_regions(ax[1,1], ['World'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
-ax[1,1].set_ylim(None, 1.e-5)
+ax[1,1].set_ylim(None, 2.e-5)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -179,27 +191,34 @@ fig, ax = plt.subplots(1, figsize=(12,8))
 countries_data['deaths'].plot_regions_rate_change(ax, country_list, scale_population=True)
 plot_finish(fig, 'country_change_of_rate_deaths_plot.png')
 
+countries_data['confirmed'].plot_regions_rate_change_animate(country_list, scale_population=True,
+        cases_min = 0.,
+        cases_max = 0.00026)
+
 
 ####################### States
 mincases = 1000
-state_list = states_data['confirmed'].find_maxes(scale_population=True, mincases=mincases, derivative=True)
+state_list = states_data['confirmed'].find_maxes(scale_population=True, mincases=mincases, derivative=False)
 if 'California' not in state_list:
     state_list.append('California')
 if 'Georgia' not in state_list:
     state_list.append('Georgia')
 
+color_list_confirmed = generate_colors(len(state_list))
+color_list_deaths = color_list_confirmed
+
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-states_data['confirmed'].plot_regions(ax[0,0], state_list, scale_population=False)
+states_data['confirmed'].plot_regions(ax[0,0], state_list, scale_population=False, color_list=color_list_confirmed)
 ax[0,0].set_ylim(1.e3)
 ax[0,0].set_yscale('log')
-states_data['deaths'].plot_regions(ax[1,0], state_list, scale_population=False)
+states_data['deaths'].plot_regions(ax[1,0], state_list, scale_population=False, color_list=color_list_deaths)
 ax[1,0].set_ylim(1.e2)
 ax[1,0].set_yscale('log')
-states_data['confirmed'].plot_regions(ax[0,1], state_list, scale_population=True, do_legend=False)
+states_data['confirmed'].plot_regions(ax[0,1], state_list, scale_population=True, do_legend=False, color_list=color_list_confirmed)
 countries_data['confirmed'].plot_regions(ax[0,1], ['US'], scale_population=True, do_legend=True, line_color='k--')
 #ax[0,1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-states_data['deaths'].plot_regions(ax[1,1], state_list, scale_population=True)
+states_data['deaths'].plot_regions(ax[1,1], state_list, scale_population=True, color_list=color_list_deaths)
 countries_data['deaths'].plot_regions(ax[1,1], ['US'], scale_population=True, line_color='k--')
 
 # set nice formatting and centering for dates
@@ -234,15 +253,15 @@ if plot_time_shifted:
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-states_data['confirmed'].plot_regions(ax[0,0], state_list, scale_population=False, derivative=True, do_legend=False)
+states_data['confirmed'].plot_regions(ax[0,0], state_list, scale_population=False, derivative=True, do_legend=False, color_list=color_list_confirmed)
 ax[0,0].set_ylim(1.e1)
 ax[0,0].set_yscale('log')
-states_data['deaths'].plot_regions(ax[1,0], state_list, scale_population=False, derivative=True, do_legend=False)
+states_data['deaths'].plot_regions(ax[1,0], state_list, scale_population=False, derivative=True, do_legend=False, color_list=color_list_deaths)
 ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
-states_data['confirmed'].plot_regions(ax[0,1], state_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+states_data['confirmed'].plot_regions(ax[0,1], state_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days, color_list=color_list_confirmed)
 countries_data['confirmed'].plot_regions(ax[0,1], ['US'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
-states_data['deaths'].plot_regions(ax[1,1], state_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+states_data['deaths'].plot_regions(ax[1,1], state_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days, color_list=color_list_deaths)
 countries_data['deaths'].plot_regions(ax[1,1], ['US'], scale_population=True, derivative=True, do_legend=False, line_color='k--', number_of_days=number_of_days)
 
 # set nice formatting and centering for dates
@@ -279,7 +298,9 @@ if plot_scatter_plots:
     plot_finish(fig, 'state_scatter_plot_14days.png')
 
 # Plot change of rate
-state_list = states_data['confirmed'].find_maxes(scale_population=True, derivative=False, ncases=30)
+state_list = states_data['confirmed'].find_maxes(scale_population=True, derivative=False, ncases=500)
+if 'California' not in state_list:
+    state_list.append('California')
 fig, ax = plt.subplots(1, figsize=(12,8))
 states_data['confirmed'].plot_regions_rate_change(ax, state_list, scale_population=True)
 plot_finish(fig, 'state_change_of_rate_confirmed_plot.png')
@@ -287,27 +308,34 @@ fig, ax = plt.subplots(1, figsize=(12,8))
 states_data['deaths'].plot_regions_rate_change(ax, state_list, scale_population=True)
 plot_finish(fig, 'state_change_of_rate_deaths_plot.png')
 
+states_data['confirmed'].plot_regions_rate_change_animate(state_list, scale_population=True,
+        cases_min = 0.,
+        cases_max = 0.0005)
+
 
 ####################### Counties
 mincases = 100
-#county_list = counties_data['confirmed'].find_maxes(scale_population=True, mincases=mincases, derivative=True)
-county_list = counties_data['confirmed'].find_maxes(mincases=mincases, derivative=True)
+county_list = counties_data['confirmed'].find_maxes(scale_population=True, mincases=mincases, derivative=False)
+#county_list = counties_data['confirmed'].find_maxes(mincases=mincases, derivative=False)
 if 'Contra Costa' not in county_list:
     county_list.append('Contra Costa')
 if 'Alameda' not in county_list:
     county_list.append('Alameda')
 
+color_list_confirmed = generate_colors(len(county_list))
+color_list_deaths = color_list_confirmed
+
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-counties_data['confirmed'].plot_regions(ax[0,0], county_list, scale_population=False)
+counties_data['confirmed'].plot_regions(ax[0,0], county_list, scale_population=False, color_list=color_list_confirmed)
 ax[0,0].set_ylim(1.e2)
 ax[0,0].set_yscale('log')
-counties_data['deaths'].plot_regions(ax[1,0], county_list, scale_population=False)
+counties_data['deaths'].plot_regions(ax[1,0], county_list, scale_population=False, color_list=color_list_deaths)
 ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
-counties_data['confirmed'].plot_regions(ax[0,1], county_list, scale_population=True, do_legend=False)
+counties_data['confirmed'].plot_regions(ax[0,1], county_list, scale_population=True, do_legend=False, color_list=color_list_confirmed)
 states_data['confirmed'].plot_regions(ax[0,1], ['California'], scale_population=True, do_legend=True, line_color='k--', start_date=datetime.date(2020, 3, 20))
-counties_data['deaths'].plot_regions(ax[1,1], county_list, scale_population=True)
+counties_data['deaths'].plot_regions(ax[1,1], county_list, scale_population=True, color_list=color_list_deaths)
 states_data['deaths'].plot_regions(ax[1,1], ['California'], scale_population=True, line_color='k--',start_date=datetime.date(2020, 3, 20))
 
 # set nice formatting and centering for dates
@@ -340,18 +368,18 @@ if plot_time_shifted:
 
 fig, ax = plt.subplots(2, 2, figsize=(12,8))
 
-counties_data['confirmed'].plot_regions(ax[0,0], county_list, scale_population=False, derivative=True, do_legend=False)
+counties_data['confirmed'].plot_regions(ax[0,0], county_list, scale_population=False, derivative=True, do_legend=False, color_list=color_list_confirmed)
 ax[0,0].set_ylim(1.)
 ax[0,0].set_yscale('log')
-counties_data['deaths'].plot_regions(ax[1,0], county_list, scale_population=False, derivative=True, do_legend=False)
+counties_data['deaths'].plot_regions(ax[1,0], county_list, scale_population=False, derivative=True, do_legend=False, color_list=color_list_deaths)
 ax[1,0].set_ylim(1.)
 ax[1,0].set_yscale('log')
-counties_data['confirmed'].plot_regions(ax[0,1], county_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+counties_data['confirmed'].plot_regions(ax[0,1], county_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days, color_list=color_list_confirmed)
 states_data['confirmed'].plot_regions(ax[0,1], ['California'], scale_population=True, derivative=True, do_legend=True, line_color='k--', number_of_days=number_of_days)
 #ax[0,1].set_ylim(None, 0.0004)
-counties_data['deaths'].plot_regions(ax[1,1], county_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days)
+counties_data['deaths'].plot_regions(ax[1,1], county_list, scale_population=True, derivative=True, do_legend=False, number_of_days=number_of_days, color_list=color_list_deaths)
 states_data['deaths'].plot_regions(ax[1,1], ['California'], scale_population=True, derivative=True, do_legend=False, line_color='k--', number_of_days=number_of_days)
-ax[1,1].set_ylim(None, 8.e-6)
+ax[1,1].set_ylim(None, 2.e-5)
 
 # set nice formatting and centering for dates
 fig.autofmt_xdate()
@@ -382,6 +410,10 @@ fig, ax = plt.subplots(1, figsize=(12,8))
 counties_data['deaths'].plot_regions_rate_change(ax, county_list, scale_population=True)
 plot_finish(fig, 'county_change_of_rate_deaths_plot.png')
 
+counties_data['confirmed'].plot_regions_rate_change_animate(county_list, scale_population=True,
+        cases_min = 0.,
+        cases_max = 0.0004)
+
 """
 # The format for the dates keeps changing
 # -------- with hospitalization counts
@@ -402,6 +434,16 @@ fig.autofmt_xdate()
 fig.text(0.87, 0.58, f'Top 10 per capita\nwith cases > {mincases},\nplus others')
 plot_finish(fig, 'county_hospitalization.png')
 """
+
+fig, ax = plt.subplots(figsize=(12,8))
+counties_data['confirmed'].plot_map(fig, ax, derivative=True)
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.savefig('../../Dropbox/Public/COVID19/CA_map_cases_per_day.png')
+
+fig, ax = plt.subplots(figsize=(12,8))
+counties_data['confirmed'].plot_map(fig, ax, derivative=False)
+fig.suptitle('data from https://github.com/CSSEGISandData/COVID-19', y=0.02)
+fig.savefig('../../Dropbox/Public/COVID19/CA_map_cumulative_cases.png')
 
 ####################### Death rates
 

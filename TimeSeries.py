@@ -1,14 +1,20 @@
 # data from https://github.com/CSSEGISandData/COVID-19
 
 import os
+import pickle
 import pandas
 import numpy as np
 from datetime import datetime
 import matplotlib
 import matplotlib.pyplot as plt
-import state_codes
+from matplotlib.animation import FuncAnimation
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
 
-matplotlib.interactive(True)
+import state_codes
+from CA_counties import counties
+
+#matplotlib.interactive(True)
 
 def smoother(n, nsmooth=1):
     for i in range(nsmooth):
@@ -29,6 +35,7 @@ class _TimeSeriesPlotter(object):
         nsmooth = kw.get('nsmooth', 15)
         doubling_days_max = kw.get('doubling_days_max', 40.)
         line_color = kw.get('line_color', None)
+        color_tuple = kw.get('color_tuple', None)
 
         cases, dates = self.data(region)
 
@@ -85,10 +92,12 @@ class _TimeSeriesPlotter(object):
             cases = cases[-number_of_days:]
             dates = dates[-number_of_days:]
 
-        if line_color is None:
+        if line_color is None and color_tuple is None:
             ax.plot(dates, cases, label=region)
-        else:
+        elif line_color is not None:
             ax.plot(dates, cases, line_color, label=region)
+        elif color_tuple is not None:
+            ax.plot(dates, cases, color=color_tuple, label=region)
 
     def plot_regions(self, ax, region_list, **kw):
         scale_population = kw.get('scale_population', False)
@@ -97,8 +106,11 @@ class _TimeSeriesPlotter(object):
         day_zero_value = kw.get('day_zero_value', None)
         do_legend = kw.get('do_legend', False)
         ylabel = kw.get('ylabel', None)
+        color_list = kw.get('color_list', None)
 
-        for region in region_list:
+        for i, region in enumerate(region_list):
+            if color_list is not None:
+                kw['color_tuple'] = color_list[i]
             self.plot_region(ax, region, kw)
 
         if day_zero_value is None:
@@ -181,7 +193,7 @@ class _TimeSeriesPlotter(object):
             if since_days is None:
                 current_cases = cases[-1]
             else:
-                current_cases = cases[-1] - cases[-since_days-1]
+                current_cases = (cases[-1] - cases[-since_days-1])/since_days
             population = int(self.populations[self.populations['Name'] == region]['Population'])
             current_cases_scaled = current_cases/population
             name = self.map_region_name(region)
@@ -203,12 +215,160 @@ class _TimeSeriesPlotter(object):
 
         ax.tick_params(right=True, labelright=False, which='both')
 
+    def plot_regions_rate_change_update(self, frame):
+        update_lines = (len(self.lines) > 0)
+
+        last_day = -self.num_frames + frame
+
+        t = self.trajectory_days
+
+        for i, region in enumerate(self.region_list):
+            name = self.map_region_name(region)
+            if name is None:
+                continue
+    
+            cases, dates = self.data(region)
+            last_week_cases = (cases[last_day] - cases[-t+last_day])/t
+            previous_week_cases = (cases[-t+last_day] - cases[-2*t+last_day])/t
+
+            if self.scale_population:
+                population = int(self.populations[self.populations['Name'] == region]['Population'])
+                last_week_cases /= population
+                previous_week_cases /= population
+
+            color = 'k'
+            if region in ['US', 'California', 'Contra Costa', 'Alameda']:
+                color = 'r'
+            if region in ['Alameda', 'Spain']:
+                color = 'b'
+            if region in ['France']:
+                color = 'g'
+            if update_lines:
+                self.texts[i].set_position((last_week_cases, previous_week_cases))
+            else:
+                tx = self.ax.text(last_week_cases, previous_week_cases, name,
+                             horizontalalignment = 'center',
+                             verticalalignment = 'center',
+                             color = color)
+                self.texts[i] = tx
+
+            if region in ['US', 'California', 'Contra Costa', 'Alameda', 'Spain', 'France']:
+                if last_day == -1:
+                    l1 = None
+                else:
+                    l1 = last_day+1
+                last_week_cases = (cases[-t+last_day:l1] - cases[-2*t+last_day:-t+last_day+1])/t
+                previous_week_cases = (cases[-2*t+last_day:-t+last_day+1] - cases[-3*t+last_day:-2*t+last_day+1])/t
+
+                if self.scale_population:
+                    last_week_cases /= population
+                    previous_week_cases /= population
+
+                if update_lines:
+                    self.lines[i].set_data(last_week_cases, previous_week_cases)
+                else:
+                    ln, = self.ax.plot(last_week_cases, previous_week_cases, color)
+                    self.lines[i] = ln
+
+        return list(self.lines.values()) + list(self.texts.values())
+
+    def plot_regions_rate_change_init(self):
+
+        self.ax.set_xlim(self.cases_min, self.cases_max)
+        self.ax.set_ylim(self.cases_min, self.cases_max)
+        self.ax.plot([self.cases_min, self.cases_max], [self.cases_min, self.cases_max], 'r')
+
+        self.ax.text(self.cases_max/2., self.cases_max*0.97, 'Improving',
+                     horizontalalignment = 'center',
+                     verticalalignment = 'center',
+                     color = 'r')
+        self.ax.text(self.cases_max/2., self.cases_max*0.03, 'Worsening',
+                     horizontalalignment = 'center',
+                     verticalalignment = 'center',
+                     color = 'r')
+
+        xlabel = f'Most recent week {self.which} per day'
+        ylabel = f'Two weeks ago {self.which} per day'
+
+        if self.scale_population:
+            xlabel += ' per capita'
+            ylabel += ' per capita'
+
+        self.ax.set_xlabel(xlabel)
+        self.ax.set_ylabel(ylabel)
+
+        self.ax.tick_params(right=True, labelright=False, which='both')
+
+        return list(self.lines.values()) + list(self.texts.values())
+
+    def plot_regions_rate_change_animate(self, region_list, **kw):
+        self.region_list = region_list
+        self.scale_population = kw.get('scale_population', True)
+        self.trajectory_days = kw.get('trajectory_days', 7)
+        self.num_frames = kw.get('num_frames', 14)
+        self.cases_min = kw.get('cases_min', None)
+        self.cases_max = kw.get('cases_max', None)
+
+        fig, self.ax = plt.subplots(figsize=(10., 7.))
+
+        self.ax.set_xlim(self.cases_min, self.cases_max)
+        self.ax.set_ylim(self.cases_min, self.cases_max)
+        self.ax.plot([self.cases_min, self.cases_max], [self.cases_min, self.cases_max], 'r')
+
+        self.ax.text(self.cases_max/2., self.cases_max*0.97, 'Improving',
+                     horizontalalignment = 'center',
+                     verticalalignment = 'center',
+                     color = 'r')
+        self.ax.text(self.cases_max/2., self.cases_max*0.03, 'Worsening',
+                     horizontalalignment = 'center',
+                     verticalalignment = 'center',
+                     color = 'r')
+
+        xlabel = f'Most recent week {self.which} per day'
+        ylabel = f'Two weeks ago {self.which} per day'
+
+        if self.scale_population:
+            xlabel += ' per capita'
+            ylabel += ' per capita'
+
+        self.ax.set_xlabel(xlabel)
+        self.ax.set_ylabel(ylabel)
+
+        self.ax.tick_params(right=True, labelright=False, which='both')
+
+        self.lines = {}
+        self.texts = {}
+        #self.plot_regions_rate_change_update(0)
+
+        ani = FuncAnimation(fig, self.plot_regions_rate_change_update,
+                            #init_func = self.plot_regions_rate_change_init,
+                            frames = self.num_frames,
+                            blit = True)
+
+        plt.show()
+
+        # clean up
+        #del self.region_list
+        #del self.scale_population
+        #del self.trajectory_days
+        #del self.num_frames
+        #del self.cases_min
+        #del self.cases_max
+        #del self.ax
+        #del self.lines
+        #del self.texts
+
     def plot_regions_rate_change(self, ax, region_list, **kw):
         scale_population = kw.get('scale_population', True)
         trajectory_days = kw.get('trajectory_days', 7)
+        last_day = kw.get('last_day', -1)
 
-        cases_min = 1.e10
-        cases_max = 0.
+        cases_min = kw.get('cases_min', None)
+        cases_max = kw.get('cases_max', None)
+        auto_minmax = (cases_max is None)
+        if auto_minmax:
+            cases_min = 1.e10
+            cases_max = 0.
 
         for region in region_list:
             name = self.map_region_name(region)
@@ -216,31 +376,40 @@ class _TimeSeriesPlotter(object):
                 continue
     
             cases, dates = self.data(region)
-            last_week_cases = (cases[-1] - cases[-trajectory_days-1])/trajectory_days
-            previous_week_cases = (cases[-trajectory_days-1] - cases[-2*trajectory_days-1])/trajectory_days
+            last_week_cases = (cases[last_day] - cases[-trajectory_days+last_day])/trajectory_days
+            previous_week_cases = (cases[-trajectory_days+last_day] - cases[-2*trajectory_days+last_day])/trajectory_days
 
             if scale_population:
                 population = int(self.populations[self.populations['Name'] == region]['Population'])
                 last_week_cases /= population
                 previous_week_cases /= population
 
-            cases_min = min(last_week_cases, cases_min)
-            cases_min = min(previous_week_cases, cases_min)
-            cases_max = max(last_week_cases, cases_max)
-            cases_max = max(previous_week_cases, cases_max)
+            if auto_minmax:
+                cases_min = min(last_week_cases, cases_min)
+                cases_min = min(previous_week_cases, cases_min)
+                cases_max = max(last_week_cases, cases_max)
+                cases_max = max(previous_week_cases, cases_max)
 
             color = 'k'
             if region in ['US', 'California', 'Contra Costa', 'Alameda']:
                 color = 'r'
+            if region in ['Alameda', 'Spain']:
+                color = 'b'
+            if region in ['France']:
+                color = 'g'
             ax.text(last_week_cases, previous_week_cases, name,
                     horizontalalignment = 'center',
                     verticalalignment = 'center',
                     color = color)
 
-            if region in ['US', 'California', 'Contra Costa', 'Alameda', 'Spain']:
+            if region in ['US', 'California', 'Contra Costa', 'Alameda', 'Spain', 'France']:
                 t = trajectory_days
-                last_week_cases = (cases[-t-1:] - cases[-2*t-1:-t])/t
-                previous_week_cases = (cases[-2*t-1:-t] - cases[-3*t-1:-2*t])/t
+                if last_day == -1:
+                    l1 = None
+                else:
+                    l1 = last_day+1
+                last_week_cases = (cases[-t+last_day:l1] - cases[-2*t+last_day:-t+last_day+1])/t
+                previous_week_cases = (cases[-2*t+last_day:-t+last_day+1] - cases[-3*t+last_day:-2*t+last_day+1])/t
 
                 if scale_population:
                     last_week_cases /= population
@@ -248,16 +417,17 @@ class _TimeSeriesPlotter(object):
 
                 ax.plot(last_week_cases, previous_week_cases, color)
 
-        if not scale_population:
-            cases_min = max(1., cases_min)
-            cases_min = 10.**(int(np.log10(cases_min))  )
-            cases_max = 10.**(int(np.log10(cases_max))+1)
-            ax.set_xscale('log')
-            ax.set_yscale('log')
-        else:
-            base = 10.**(np.floor(np.log10(cases_max)))
-            cases_max = base*(np.floor(5*cases_max/base) + 1)/5
-            cases_min = 0.
+        if auto_minmax:
+            if not scale_population:
+                cases_min = max(1., cases_min)
+                cases_min = 10.**(int(np.log10(cases_min))  )
+                cases_max = 10.**(int(np.log10(cases_max))+1)
+                ax.set_xscale('log')
+                ax.set_yscale('log')
+            else:
+                base = 10.**(np.floor(np.log10(cases_max)))
+                cases_max = base*(np.floor(5*cases_max/base) + 1)/5
+                cases_min = 0.
 
         ax.set_xlim(cases_min, cases_max)
         ax.set_ylim(cases_min, cases_max)
@@ -390,6 +560,8 @@ class TimeSeriesStates(_TimeSeriesBase):
             result = None
         return result
 
+
+
 class TimeSeriesCounties(_TimeSeriesBase):
     """Handles time series data for counties
     - which: either confirmed or deaths
@@ -407,3 +579,73 @@ class TimeSeriesCounties(_TimeSeriesBase):
 
     def select_area(self):
         return self.dataframe[self.dataframe['Province_State'] == self.state]
+
+    def plot_map(self, fig, ax, scale_population=True, derivative=False, since_days = 7, cmap='nipy_spectral'):
+
+        Rearth = 6378. # km
+        patches = []
+        cases_list = []
+        dataframe = self.select_area()
+        for county_name in dataframe[self.region_column]:
+            if county_name not in counties.boundaries_dict:
+                continue
+
+            cases, dates = self.data(county_name)
+
+            if derivative:
+                current_cases = (cases[-1] - cases[-since_days-1])/since_days
+            else:
+                current_cases = cases[-1]
+
+            if scale_population:
+                population = int(self.populations[self.populations['Name'] == county_name]['Population'])
+                current_cases = current_cases/population
+
+            for block in counties.boundaries_dict[county_name]:
+                cases_list.append(current_cases)
+                longitude = block[:,0] + 120.
+                latitude = block[:,1] - 40.
+                R = Rearth*np.cos(latitude*np.pi/180.)
+                xx = R*np.sin(longitude*np.pi/180.)
+                yy = Rearth*np.sin(latitude*np.pi/180.)
+                grid = np.zeros_like(block)
+                grid[:,0] = xx
+                grid[:,1] = yy
+                pp = Polygon(grid, True)
+                patches.append(pp)
+
+        cmin = min(cases_list)
+        cmax = max(cases_list)
+        fmax = 10**(-int(np.log10(cmax))+2)
+        fmin = fmax #10**(-int(np.log10(cmin))+1)
+        vmin = max(0, int(np.floor(cmin*fmin)))
+        vmax = int(np.ceil(cmax*fmax))
+        if vmin%2 != vmax%2:
+            if vmin >= 1:
+                vmin -= 1
+            else:
+                vmax += 1
+        vmin /= fmin
+        vmax /= fmax
+
+        p = PatchCollection(patches, edgecolor=None, cmap=cmap)
+        p.set_array(np.array(cases_list))
+        p.set_clim(vmin, vmax)
+
+        ax.axis('equal')
+        ax.add_collection(p)
+        ax.autoscale(tight=True)
+        ax.autoscale_view(tight=True)
+        ax.axis('off')
+        fig.colorbar(p, ax=ax)
+
+        if derivative:
+            title_string = f'new {self.which} per day averaged over {since_days} days'
+        else:
+            title_string = f'cumulative {self.which}'
+        if scale_population:
+            title_string += ' per capita'
+
+        ax.set_title(title_string)
+
+
